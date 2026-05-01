@@ -1,0 +1,29 @@
+[
+  {
+    "id": 1,
+    "title": "Arrest Scenario",
+    "videoUrl": "/videos/arrest.mp4",
+    "correctLabel": "Arrest",
+    "normality": "abnormal",
+    "description": "Short CCTV clip showing arrest situation",
+    "explanation": "This scenario clearly depicts law enforcement officers taking a suspect into custody. The presence of uniforms and the use of handcuffs are key indicators."
+  },
+  {
+    "id": 2,
+    "title": "Store Robbery",
+    "videoUrl": "/videos/arrest.mp4",
+    "correctLabel": "Robbery",
+    "normality": "abnormal",
+    "description": "Footage from a convenience store showing an armed robbery.",
+    "explanation": "The suspect is seen brandishing a weapon and demanding money from the cashier. This is a high-priority abnormal event."
+  },
+  {
+    "id": 3,
+    "title": "Street Fight",
+    "videoUrl": "/videos/arrest.mp4",
+    "correctLabel": "Fighting",
+    "normality": "abnormal",
+    "description": "Surveillance video of two individuals engaged in a physical altercation.",
+    "explanation": "Rapid, aggressive movements and physical contact between individuals indicate a fight. Early detection can prevent serious injury."
+  }
+]
