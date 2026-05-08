@@ -15,11 +15,30 @@ const Login = () => {
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
+  const getErrorMessage = (detail) => {
+    if (typeof detail === 'string') {
+      return detail;
+    }
+
+    if (Array.isArray(detail) && detail.length > 0) {
+      return detail
+        .map((item) => item?.msg || item?.message)
+        .filter(Boolean)
+        .join('. ') || 'Invalid login details';
+    }
+
+    if (detail && typeof detail === 'object') {
+      return detail.message || detail.msg || 'Invalid login details';
+    }
+
+    return 'Invalid credentials. Please try again.';
+  };
+
   const showToast = (message, type = 'success') => {
-    setToast({ message, type });
     if (toastTimer.current) {
       clearTimeout(toastTimer.current);
     }
+    setToast({ message, type, id: Date.now() });
     toastTimer.current = setTimeout(() => {
       setToast(null);
     }, 3000);
@@ -31,7 +50,19 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (toastTimer.current) {
+      clearTimeout(toastTimer.current);
+    }
     setToast(null);
+
+    const email = formData.email.trim();
+    const password = formData.password;
+
+    if (!email || !password) {
+      showToast('Please enter email and password', 'error');
+      return;
+    }
 
     try {
       const response = await fetch('/api/v1/auth/login', {
@@ -40,14 +71,20 @@ const Login = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
+          email,
+          password,
         }),
       });
 
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        showToast(data?.detail || 'Login failed', 'error');
+        let errorMessage = 'Invalid credentials. Please try again.';
+        try {
+          const data = await response.json();
+          errorMessage = getErrorMessage(data?.detail);
+        } catch {
+          errorMessage = 'Invalid credentials. Please try again.';
+        }
+        showToast(errorMessage, 'error');
         return;
       }
 
@@ -65,18 +102,18 @@ const Login = () => {
 
   return (
     <div className="login-container">
+      {toast ? (
+        <div className="toast-container">
+          <div key={toast.id} className={`toast toast-${toast.type}`}>{toast.message}</div>
+        </div>
+      ) : null}
+
       {/* Left Panel with form */}
       <div className="login-left">
         <div className="login-form-wrapper">
           <h2 className="login-title">Login</h2>
 
-          {toast ? (
-            <div className="toast-container">
-              <div className={`toast toast-${toast.type}`}>{toast.message}</div>
-            </div>
-          ) : null}
-
-          <form onSubmit={handleSubmit} className="login-form">
+          <form onSubmit={handleSubmit} className="login-form" noValidate>
             <div className="input-group">
               <input
                 type="email"

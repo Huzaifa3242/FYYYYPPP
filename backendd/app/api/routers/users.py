@@ -112,12 +112,13 @@ def get_user_stats(
     total_count = len(total)
     anomalies_count = sum(1 for r in total if r.status == "abnormal")
     normal_count = total_count - anomalies_count
+    anomaly_rate = round((anomalies_count / total_count) * 100, 1) if total_count else 0
     
     return {
         "total_analyses": total_count,
         "anomalies_detected": anomalies_count,
         "normal_results": normal_count,
-        "system_uptime": "99.9%",
+        "anomaly_rate": anomaly_rate,
     }
 
 
@@ -135,6 +136,145 @@ def get_user_activity(
     ).all()
     
     return reports
+
+
+@router.get("/me/reports")
+def get_user_reports(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    reports = session.exec(
+        select(AnalysisReport)
+        .where(AnalysisReport.user_id == current_user.id)
+        .order_by(AnalysisReport.created_at.desc())
+    ).all()
+
+    return reports
+
+
+@router.get("/me/reports/{report_id}")
+def get_user_report(
+    report_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    report = session.exec(
+        select(AnalysisReport)
+        .where(AnalysisReport.id == report_id)
+        .where(AnalysisReport.user_id == current_user.id)
+    ).first()
+
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    return report
+
+
+@router.get("/me/intelligence")
+def get_user_intelligence(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    reports = session.exec(
+        select(AnalysisReport)
+        .where(AnalysisReport.user_id == current_user.id)
+        .order_by(AnalysisReport.created_at.desc())
+    ).all()
+
+    severity_weights = {
+        "Explosion": 1.0,
+        "Shooting": 1.0,
+        "Arson": 0.9,
+        "Assault": 0.85,
+        "Abuse": 0.8,
+        "Fighting": 0.75,
+        "Arrest": 0.7,
+        "Stealing": 0.65,
+        "Shoplifting": 0.55,
+    }
+
+    class_counts = {}
+    confidence_buckets = {
+        "Low <70%": 0,
+        "Medium 70-90%": 0,
+        "High >90%": 0,
+    }
+    severity_queue = {
+        "Critical": 0,
+        "High": 0,
+        "Medium": 0,
+        "Low": 0,
+    }
+    latest_high_risk = None
+    best_risk_score = -1
+    total_confidence = 0
+    confidence_count = 0
+    total_footage_sec = 0
+    llm_generated = 0
+
+    for report in reports:
+        class_name = "Normal" if report.top_class == "NormalVideosforEventRecognition" else report.top_class
+        class_counts[class_name] = class_counts.get(class_name, 0) + 1
+
+        confidence = report.confidence or 0
+        total_confidence += confidence
+        confidence_count += 1
+        total_footage_sec += report.duration_sec or 0
+
+        if confidence < 0.7:
+            confidence_buckets["Low <70%"] += 1
+        elif confidence < 0.9:
+            confidence_buckets["Medium 70-90%"] += 1
+        else:
+            confidence_buckets["High >90%"] += 1
+
+        if report.llm_report:
+            llm_generated += 1
+
+        if report.status == "abnormal":
+            if class_name in {"Explosion", "Shooting"}:
+                severity_queue["Critical"] += 1
+            elif class_name in {"Arson", "Assault", "Abuse", "Fighting"}:
+                severity_queue["High"] += 1
+            elif class_name in {"Arrest", "Stealing"}:
+                severity_queue["Medium"] += 1
+            else:
+                severity_queue["Low"] += 1
+
+            risk_score = round((severity_weights.get(class_name, 0.5) * confidence) * 100, 1)
+            if risk_score > best_risk_score:
+                best_risk_score = risk_score
+                latest_high_risk = {
+                    "id": report.id,
+                    "filename": report.filename,
+                    "top_class": class_name,
+                    "confidence": confidence,
+                    "risk_score": risk_score,
+                    "created_at": report.created_at,
+                }
+
+    total_reports = len(reports)
+
+    return {
+        "threat_distribution": [
+            {"class_name": key, "count": value}
+            for key, value in sorted(class_counts.items(), key=lambda item: item[1], reverse=True)
+        ],
+        "confidence_distribution": [
+            {"bucket": key, "count": value}
+            for key, value in confidence_buckets.items()
+        ],
+        "severity_queue": [
+            {"severity": key, "count": value}
+            for key, value in severity_queue.items()
+        ],
+        "avg_confidence": round((total_confidence / confidence_count) * 100, 1) if confidence_count else 0,
+        "llm_coverage": round((llm_generated / total_reports) * 100, 1) if total_reports else 0,
+        "llm_generated": llm_generated,
+        "total_reports": total_reports,
+        "total_footage_minutes": round(total_footage_sec / 60, 2),
+        "latest_high_risk": latest_high_risk,
+    }
 
 
 @router.get("/me/trend")

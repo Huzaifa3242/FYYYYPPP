@@ -7,6 +7,12 @@
   font-family: 'Inter', sans-serif;
   scroll-behavior: smooth;
   overflow-x: hidden;
+  width: 100%;
+  min-height: 100vh;
+}
+
+.home-container * {
+  box-sizing: border-box;
 }
 
 .features,
@@ -22,10 +28,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem 5%;
+  gap: 1.5rem;
+  padding: 1.25rem 5%;
   position: absolute;
   top: 0;
-  width: 90%;
+  left: 0;
+  width: 100%;
   z-index: 100;
 }
 
@@ -35,6 +43,7 @@
   gap: 10px;
   font-weight: 600;
   letter-spacing: 1px;
+  flex-shrink: 0;
 }
 
 .logo-icon {
@@ -45,21 +54,31 @@
   border-radius: 4px;
 }
 
-.nav-links {
+.home-nav-links {
   display: flex;
   list-style: none;
-  gap: 2rem;
+  gap: clamp(0.75rem, 2vw, 2rem);
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 0;
+  margin: 0;
 }
 
-.nav-links a {
+.home-nav-links a {
   text-decoration: none;
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.9rem;
   transition: color 0.3s;
 }
 
-.nav-links a:hover {
+.home-nav-links a:hover {
   color: #ffffff;
+}
+
+.mobile-nav-toggle,
+.mobile-login-link {
+  display: none;
 }
 
 .nav-login-btn {
@@ -72,6 +91,7 @@
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(5px);
   transition: all 0.3s;
+  flex-shrink: 0;
 }
 
 .nav-login-btn:hover {
@@ -83,7 +103,7 @@
    Hero Section
    =========================== */
 .hero {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -91,14 +111,14 @@
   text-align: center;
   background: radial-gradient(circle at 50% 20%, #1a3f47 0%, #0D242C 70%);
   position: relative;
-  padding: 0 10%;
+  padding: 8rem 5% 7rem;
 }
 
 .hero-title {
-  font-size: 4.5rem;
+  font-size: clamp(2.4rem, 8vw, 4.5rem);
   font-weight: 400;
   line-height: 1.1;
-  margin-bottom: 2rem;
+  margin-bottom: clamp(1.25rem, 3vw, 2rem);
   letter-spacing: -1px;
 }
 
@@ -143,15 +163,15 @@
 }
 
 .hero-subtitle {
-  font-size: 1.1rem;
+  font-size: clamp(0.9rem, 2vw, 1.1rem);
   color: rgba(255, 255, 255, 0.6);
   line-height: 1.6;
-  margin-bottom: 3rem;
+  margin-bottom: clamp(1.75rem, 4vw, 3rem);
   max-width: 600px;
 }
 
 .hero-btn {
-  padding: 14px 40px;
+  padding: 14px clamp(28px, 8vw, 40px);
   background: linear-gradient(90deg, #163a44, #24606B);
   border: none;
   border-radius: 30px;
@@ -166,9 +186,9 @@
    Features Section
    =========================== */
 .features {
-  padding: 5rem 10%;
+  padding: clamp(3rem, 8vw, 5rem) 5%;
   background-color: #ffffff;
-  border-radius: 50px 50px 0 0;
+  border-radius: clamp(28px, 6vw, 50px) clamp(28px, 6vw, 50px) 0 0;
   margin-top: -50px;
   position: relative;
   z-index: 10;
@@ -176,13 +196,15 @@
 
 .feature-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: clamp(1rem, 3vw, 2rem);
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
 .feature-card {
   background-color: #0D242C;
-  padding: 3rem 2rem;
+  padding: clamp(1.5rem, 4vw, 3rem) clamp(1.25rem, 3vw, 2rem);
   border-radius: 24px;
   transition: transform 0.3s;
   position: relative;
@@ -196,14 +218,14 @@
    Applications Section
    =========================== */
 .applications {
-  padding: 8rem 5%;
+  padding: clamp(4rem, 9vw, 8rem) 5%;
   background-color: #0D242C;
 }
 
 .section-title {
   text-align: center;
-  font-size: 2.5rem;
-  margin-bottom: 4rem;
+  font-size: clamp(1.8rem, 5vw, 2.5rem);
+  margin-bottom: clamp(2rem, 6vw, 4rem);
   font-weight: 300;
 }
 
@@ -213,15 +235,15 @@
 
 .app-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 30px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: clamp(1.25rem, 3vw, 30px);
   max-width: 1200px;
   margin: 0 auto;
 }
 
 .app-card {
   background: #ffffff;
-  border-radius: 150px 150px 0 0;
+  border-radius: clamp(28px, 8vw, 150px) clamp(28px, 8vw, 150px) 0 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -231,7 +253,7 @@
 
 .app-image-wrapper {
   position: relative;
-  height: 220px;
+  height: clamp(180px, 28vw, 220px);
   overflow: hidden;
 }
 
@@ -263,7 +285,7 @@
 }
 
 .app-content {
-  padding: 40px 20px 20px;
+  padding: clamp(2rem, 5vw, 40px) 20px 20px;
   text-align: center;
   color: #0D242C;
   flex-grow: 1;
@@ -311,14 +333,14 @@
    Incidents Section
    =========================== */
 .incidents-section {
-  padding: 8rem 5%;
+  padding: clamp(4rem, 9vw, 8rem) 5%;
   background-color: #0D242C;
 }
 
 .incidents-container {
   background-color: #ffffff;
-  border-radius: 40px;
-  padding: 3rem;
+  border-radius: clamp(22px, 5vw, 40px);
+  padding: clamp(1.25rem, 5vw, 3rem);
   max-width: 1000px;
   margin: 0 auto;
 }
@@ -326,8 +348,8 @@
 .incidents-title {
   color: #0D242C;
   text-align: center;
-  font-size: 2.5rem;
-  margin-bottom: 3rem;
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+  margin-bottom: clamp(1.5rem, 5vw, 3rem);
 }
 
 .incident-card {
@@ -377,6 +399,7 @@
 .incident-meta {
   display: flex;
   gap: 2rem;
+  flex-wrap: wrap;
   margin-bottom: 10px;
   font-weight: 500;
   font-size: 0.9rem;
@@ -407,13 +430,14 @@
    =========================== */
 .main-footer {
   background-color: #050b0d;
-  padding: 5rem 5% 2rem;
+  padding: clamp(3rem, 8vw, 5rem) 5% 2rem;
 }
 
 .subscribe-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 2rem;
   padding-bottom: 4rem;
   margin-bottom: 4rem;
   border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -421,7 +445,7 @@
 
 .subscribe-inputs {
   display: flex;
-  gap: 30px;
+  gap: clamp(1rem, 3vw, 30px);
   flex-grow: 1;
   margin-right: 40px;
 }
@@ -440,7 +464,7 @@
   background: linear-gradient(to right, #0D242C, #24606B);
   color: #fff;
   border: none;
-  padding: 12px 60px;
+  padding: 12px clamp(32px, 8vw, 60px);
   border-radius: 30px;
   cursor: pointer;
   box-shadow: 0 4px 15px rgba(0,0,0,0.5);
@@ -449,7 +473,7 @@
 .footer-content {
   display: flex;
   justify-content: space-between;
-  gap: 50px;
+  gap: clamp(2rem, 6vw, 50px);
 }
 
 .footer-brand-section {
@@ -479,9 +503,10 @@
 
 .footer-links-grid {
   display: flex;
-  gap: 60px;
+  gap: clamp(2rem, 6vw, 60px);
   flex: 2;
   justify-content: space-around;
+  flex-wrap: wrap;
 }
 
 .footer-col h3 {
@@ -517,36 +542,260 @@
    Responsive Updates
    =========================== */
 @media (max-width: 1024px) {
-  .app-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .navbar {
+    align-items: flex-start;
+    gap: 1rem;
   }
-  .app-grid > .app-card:nth-child(4),
-  .app-grid > .app-card:nth-child(5) {
-    margin-left: 0;
-    grid-column: span 1;
+
+  .home-nav-links {
+    max-width: 520px;
   }
+
   .footer-content {
     flex-direction: column;
   }
 }
 
 @media (max-width: 768px) {
+  .navbar {
+    position: sticky;
+    top: 0;
+    flex-direction: row;
+    align-items: center;
+    padding: 0.9rem 5%;
+    background: rgba(13, 36, 44, 0.96);
+    backdrop-filter: blur(12px);
+  }
+
+  .nav-logo {
+    font-size: 0.9rem;
+  }
+
+  .mobile-nav-toggle {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    cursor: pointer;
+  }
+
+  .mobile-nav-toggle span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 999px;
+  }
+
+  .home-nav-links {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 5%;
+    right: 5%;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    width: auto;
+    gap: 0;
+    padding: 0.75rem;
+    background: #102f38;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 18px;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+  }
+
+  .home-nav-links.open {
+    display: flex;
+  }
+
+  .home-nav-links li {
+    width: 100%;
+  }
+
+  .home-nav-links a {
+    display: block;
+    width: 100%;
+    padding: 0.85rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .home-nav-links a:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .mobile-login-link {
+    display: block;
+  }
+
+  .nav-login-btn {
+    display: none;
+  }
+
+  .hero {
+    min-height: auto;
+    padding: 4.25rem 6% 6rem;
+  }
+
+  .hero-title {
+    font-size: clamp(2.25rem, 11vw, 3.5rem);
+  }
+
+  .hero-subtitle br {
+    display: none;
+  }
+
+  .features {
+    margin-top: -32px;
+    padding-left: 6%;
+    padding-right: 6%;
+  }
+
+  .feature-cards,
   .app-grid {
     grid-template-columns: 1fr;
+    max-width: 430px;
   }
+
   .subscribe-bar {
     flex-direction: column;
+    align-items: stretch;
     gap: 30px;
+    padding-bottom: 2.5rem;
+    margin-bottom: 2.5rem;
   }
+
   .subscribe-inputs {
     flex-direction: column;
     width: 100%;
     margin-right: 0;
   }
+
+  .subscribe-btn {
+    width: 100%;
+  }
+
   .incident-card {
     flex-direction: column;
+    border-radius: 18px;
   }
+
   .incident-image {
     width: 100%;
+    min-width: 0;
+    height: 190px;
+  }
+
+  .incident-header {
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .incident-meta {
+    gap: 1rem;
+  }
+
+  .footer-links-grid {
+    justify-content: flex-start;
+  }
+
+  .footer-links-grid .footer-col:not(.contact-col) {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar {
+    padding: 0.9rem 4%;
+  }
+
+  .logo-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .nav-logo span {
+    font-size: 0.75rem;
+  }
+
+  .home-nav-links a {
+    font-size: 0.88rem;
+  }
+
+  .hero {
+    padding: 3rem 5% 5rem;
+  }
+
+  .hero-title {
+    font-size: clamp(2rem, 12vw, 2.9rem);
+    line-height: 1.08;
+  }
+
+  .hero-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .hero-btn {
+    width: 100%;
+    max-width: 220px;
+  }
+
+  .feature-card {
+    border-radius: 18px;
+  }
+
+  .app-card {
+    border-radius: 24px 24px 0 0;
+  }
+
+  .app-image-wrapper {
+    height: 170px;
+  }
+
+  .incidents-container {
+    padding: 1rem;
+  }
+
+  .incident-content {
+    padding: 18px;
+  }
+
+  .incident-header h3 {
+    font-size: 1rem;
+  }
+
+  .footer-logo {
+    font-size: 1.35rem;
+  }
+
+  .footer-tagline {
+    font-size: 1rem;
+  }
+
+  .footer-brand-section {
+    text-align: center;
+  }
+
+  .social-icons {
+    justify-content: center;
+  }
+
+  .footer-links-grid {
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: center;
+    text-align: center;
+  }
+
+  .footer-col li {
+    justify-content: center;
   }
 }

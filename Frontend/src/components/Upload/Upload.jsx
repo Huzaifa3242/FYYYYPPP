@@ -1,10 +1,19 @@
 import React, { useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   FileText, 
   Phone, 
   Mail, 
-  MapPin 
+  MapPin,
+  Menu,
+  X,
+  LayoutDashboard,
+  Upload as UploadIcon,
+  MessageSquare,
+  BookOpen,
+  Settings,
+  LogOut
 } from 'lucide-react';
 import './Upload.css';
 
@@ -16,6 +25,7 @@ const Upload = () => {
   const [report, setReport] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const addFiles = (newFiles) => {
     const valid = newFiles.filter(
@@ -133,12 +143,50 @@ const Upload = () => {
 
   return (
     <div className="upload-page">
+      {mobileMenuOpen && (
+        <div className="upload-mobile-menu-overlay" onClick={() => setMobileMenuOpen(false)}>
+          <div className="upload-mobile-menu" onClick={(event) => event.stopPropagation()}>
+            <div className="upload-mobile-menu-header">
+              <span>SecureVision AI</span>
+              <button className="upload-mobile-menu-close" onClick={() => setMobileMenuOpen(false)}>
+                <X size={22} />
+              </button>
+            </div>
+            <nav className="upload-mobile-nav">
+              <div className="upload-mobile-nav-item" onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}>
+                <LayoutDashboard size={20} /> Dashboard
+              </div>
+              <div className="upload-mobile-nav-item active" onClick={() => setMobileMenuOpen(false)}>
+                <UploadIcon size={20} /> Upload
+              </div>
+              <div className="upload-mobile-nav-item" onClick={() => { navigate('/chat'); setMobileMenuOpen(false); }}>
+                <MessageSquare size={20} /> AI Assistant
+              </div>
+              <div className="upload-mobile-nav-item" onClick={() => { navigate('/training'); setMobileMenuOpen(false); }}>
+                <BookOpen size={20} /> Training Module
+              </div>
+              <div className="upload-mobile-nav-item" onClick={() => { navigate('/reports'); setMobileMenuOpen(false); }}>
+                <FileText size={20} /> Reports
+              </div>
+              <div className="upload-mobile-nav-item" onClick={() => { navigate('/settings'); setMobileMenuOpen(false); }}>
+                <Settings size={20} /> Settings
+              </div>
+              <div className="upload-mobile-nav-item logout" onClick={() => { navigate('/logout'); setMobileMenuOpen(false); }}>
+                <LogOut size={20} /> Log Out
+              </div>
+            </nav>
+          </div>
+        </div>
+      )}
       {/* Navigation */}
       <nav className="top-nav">
         <div className="logo" onClick={() => navigate('/dashboard')}>
           <div className="logo-icon"></div>
           <span>SecureVision AI</span>
         </div>
+        <button className="upload-mobile-menu-btn" onClick={() => setMobileMenuOpen(true)}>
+          <Menu size={22} />
+        </button>
         <div className="nav-links">
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/upload" className="active">Upload</Link>
@@ -273,7 +321,9 @@ const Upload = () => {
               <div className="result-card">
                 <h3>Expert Security Report</h3>
                 {report ? (
-                  <p className="report-text">{report}</p>
+                  <div className="report-markdown">
+                    <ReactMarkdown>{report}</ReactMarkdown>
+                  </div>
                 ) : (
                   <p className="report-empty">No anomaly detected — report not generated.</p>
                 )}

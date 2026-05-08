@@ -81,7 +81,7 @@ const Chat = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isInitial, setIsInitial] = useState(true);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 720);
   const [threads, setThreads] = useState([]);
   const [activeThreadId, setActiveThreadId] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -117,6 +117,7 @@ const Chat = () => {
     setActiveThreadId(threadId);
     setMessages(mapApiMessages(data.messages || []));
     setIsInitial((data.messages || []).length === 0);
+    if (window.innerWidth <= 720) setIsSidebarOpen(false);
   };
 
   const createThread = async () => {
@@ -160,6 +161,7 @@ const Chat = () => {
     setActiveThreadId(null);
     setMessages([]);
     setIsInitial(true);
+    if (window.innerWidth <= 720) setIsSidebarOpen(false);
   };
 
   const handleSend = async () => {
@@ -301,8 +303,20 @@ const Chat = () => {
     init();
   }, []);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setIsSidebarOpen(window.innerWidth > 720);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
-    <div className={`premium-chat-layout ${isSidebarOpen ? '' : 'sidebar-collapsed'}`}>
+    <div className={`premium-chat-layout ${isSidebarOpen ? 'sidebar-open' : 'sidebar-collapsed'}`}>
+      {isSidebarOpen && <div className="chat-sidebar-backdrop" onClick={() => setIsSidebarOpen(false)}></div>}
       {/* Premium Sidebar */}
       <aside className="premium-sidebar">
         <div className="sidebar-brand" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
@@ -364,10 +378,10 @@ const Chat = () => {
         </div>
 
         <div className="sidebar-bottom-nav">
-          <div className="nav-link-item bottom-item" onClick={() => navigate('/dashboard')}>
+          <div className="nav-link-item bottom-item" onClick={() => { navigate('/dashboard'); if (window.innerWidth <= 720) setIsSidebarOpen(false); }}>
             <LayoutDashboard size={18} /> Dashboard
           </div>
-          <div className="nav-link-item bottom-item" onClick={() => navigate('/settings')}>
+          <div className="nav-link-item bottom-item" onClick={() => { navigate('/settings'); if (window.innerWidth <= 720) setIsSidebarOpen(false); }}>
             <Settings size={18} /> Settings
           </div>
         </div>
@@ -376,24 +390,37 @@ const Chat = () => {
       {/* Main Content Area */}
       <main className="chat-viewport">
         {isInitial ? (
-          <div className="hero-welcome-state">
-            <div className="welcome-glow-bg"></div>
-            <h1 className="hero-title">Welcome To <span className="text-gradient">SecureVision AI</span></h1>
-            <p className="hero-subtitle">Your intelligent security companion is ready to assist you.</p>
-            
-            <div className="hero-search-wrapper">
-              <input 
-                type="text" 
-                placeholder="Ask Anything..." 
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              />
-              <button className="hero-send-btn" onClick={handleSend} aria-label="Send">
-                <Send size={22} />
+          <>
+            <header className="chat-mobile-top-bar">
+              <button
+                className="sidebar-toggle"
+                onClick={() => setIsSidebarOpen((prev) => !prev)}
+                aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+              >
+                <Menu size={20} />
               </button>
+              <span className="topbar-brand">SecureVision AI</span>
+              <div className="mobile-top-spacer"></div>
+            </header>
+            <div className="hero-welcome-state">
+              <div className="welcome-glow-bg"></div>
+              <h1 className="hero-title">Welcome To <span className="text-gradient">SecureVision AI</span></h1>
+              <p className="hero-subtitle">Your intelligent security companion is ready to assist you.</p>
+              
+              <div className="hero-search-wrapper">
+                <input 
+                  type="text" 
+                  placeholder="Ask Anything..." 
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                />
+                <button className="hero-send-btn" onClick={handleSend} aria-label="Send">
+                  <Send size={22} />
+                </button>
+              </div>
             </div>
-          </div>
+          </>
         ) : (
           <div className="active-chat-interface">
             <header className="chat-top-bar">

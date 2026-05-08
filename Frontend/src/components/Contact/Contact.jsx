@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { HiPhone, HiMail, HiLocationMarker } from 'react-icons/hi';
 import { FaFacebook, FaInstagram, FaTwitter, FaLinkedin } from 'react-icons/fa';
@@ -13,6 +13,19 @@ const Contact = () => {
     message: '',
   });
   const [submitted, setSubmitted] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.style.overflow = 'auto';
+    document.body.style.overflow = 'auto';
+    document.getElementById('root')?.style.setProperty('overflow', 'visible');
+
+    return () => {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+      document.getElementById('root')?.style.removeProperty('overflow');
+    };
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -34,13 +47,24 @@ const Contact = () => {
           <div className="contact-logo-icon"></div>
           <span>SECUREVISION AI</span>
         </div>
-        <ul className="contact-nav-links">
-          <li><Link to="/home">Home</Link></li>
-          <li><a href="/home#features">Features</a></li>
-          <li><a href="/home#applications">Applications</a></li>
-          <li><a href="/home#incidents">Incident</a></li>
-          <li><Link to="/blog">Blog</Link></li>
-          <li><Link to="/contact" className="active-link">Contact Us</Link></li>
+        <button
+          className="contact-mobile-nav-toggle"
+          onClick={() => setIsMobileNavOpen((prev) => !prev)}
+          aria-label="Toggle navigation menu"
+          aria-expanded={isMobileNavOpen}
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <ul className={`contact-nav-links ${isMobileNavOpen ? 'open' : ''}`}>
+          <li><Link to="/home" onClick={() => setIsMobileNavOpen(false)}>Home</Link></li>
+          <li><a href="/home#features" onClick={() => setIsMobileNavOpen(false)}>Features</a></li>
+          <li><a href="/home#applications" onClick={() => setIsMobileNavOpen(false)}>Applications</a></li>
+          <li><a href="/home#incidents" onClick={() => setIsMobileNavOpen(false)}>Incident</a></li>
+          <li><Link to="/blog" onClick={() => setIsMobileNavOpen(false)}>Blog</Link></li>
+          <li><Link to="/contact" className="active-link" onClick={() => setIsMobileNavOpen(false)}>Contact Us</Link></li>
+          <li className="contact-mobile-login-link"><Link to="/login" onClick={() => setIsMobileNavOpen(false)}>Login</Link></li>
         </ul>
         <Link to="/login" className="contact-nav-login-btn">Login</Link>
       </nav>

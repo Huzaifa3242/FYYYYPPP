@@ -10,6 +10,7 @@ import Settings from './components/Settings/Settings';
 import Logout from './components/Logout/Logout';
 import Contact from './components/Contact/Contact';
 import Training from './components/Training/Training';
+import Reports from './components/Reports/Reports';
 
 function App() {
   return (
@@ -27,6 +28,8 @@ function App() {
         <Route path="/logout" element={<Logout />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/training" element={<Training />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="/reports/:reportId" element={<Reports />} />
       </Routes>
       </UserProvider>
     </Router>

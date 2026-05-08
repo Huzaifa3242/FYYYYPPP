@@ -13,7 +13,13 @@ import {
   Check,
   AlertTriangle,
   Loader2,
-  LogOut
+  LogOut,
+  Menu,
+  Upload,
+  MessageSquare,
+  BookOpen,
+  FileText,
+  X
 } from 'lucide-react';
 import { useUser } from '../../context/UserContext';
 import './Settings.css';
@@ -32,6 +38,7 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [toast, setToast] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const { user, updateUser, refreshUser, clearUser } = useUser();
 
@@ -225,7 +232,37 @@ const Settings = () => {
 
   return (
     <div className="settings-layout">
-      {/* Toast */}
+      {mobileMenuOpen && (
+        <div className="settings-mobile-menu-overlay" onClick={() => setMobileMenuOpen(false)}>
+          <div className="settings-mobile-menu" onClick={(event) => event.stopPropagation()}>
+            <div className="settings-mobile-menu-header">
+              <span>SecureVision AI</span>
+              <button className="settings-mobile-menu-close" onClick={() => setMobileMenuOpen(false)}>
+                <X size={22} />
+              </button>
+            </div>
+            <nav className="settings-mobile-nav">
+              <div className="settings-mobile-nav-item" onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}><LayoutDashboard size={20} /> Dashboard</div>
+              <div className="settings-mobile-nav-item" onClick={() => { navigate('/upload'); setMobileMenuOpen(false); }}><Upload size={20} /> Upload</div>
+              <div className="settings-mobile-nav-item" onClick={() => { navigate('/chat'); setMobileMenuOpen(false); }}><MessageSquare size={20} /> AI Assistant</div>
+              <div className="settings-mobile-nav-item" onClick={() => { navigate('/training'); setMobileMenuOpen(false); }}><BookOpen size={20} /> Training Module</div>
+              <div className="settings-mobile-nav-item" onClick={() => { navigate('/reports'); setMobileMenuOpen(false); }}><FileText size={20} /> Reports</div>
+              <div className="settings-mobile-nav-item active" onClick={() => setMobileMenuOpen(false)}><SettingsIcon size={20} /> Settings</div>
+              <div className="settings-mobile-nav-divider">Settings Sections</div>
+              {tabs.map(tab => (
+                <div
+                  key={tab.id}
+                  className={`settings-mobile-nav-item ${activeTab === tab.id ? 'active' : ''}`}
+                  onClick={() => { setActiveTab(tab.id); setMobileMenuOpen(false); }}
+                >
+                  <tab.icon size={20} /> {tab.label}
+                </div>
+              ))}
+              <div className="settings-mobile-nav-item logout" onClick={() => { navigate('/logout'); setMobileMenuOpen(false); }}><LogOut size={20} /> Log Out</div>
+            </nav>
+          </div>
+        </div>
+      )}
       {toast && (
         <div className={`settings-toast ${toast.type}`}>
           {toast.type === 'error' ? <AlertTriangle size={16} /> : <Check size={16} />}
@@ -269,6 +306,9 @@ const Settings = () => {
       <main className="settings-content">
         <header className="settings-header">
           <div className="header-left">
+            <button className="settings-mobile-menu-btn" onClick={() => setMobileMenuOpen(true)}>
+              <Menu size={22} />
+            </button>
             <button className="back-btn-circle" onClick={() => navigate('/dashboard')}>
               <ArrowLeft size={20} />
             </button>

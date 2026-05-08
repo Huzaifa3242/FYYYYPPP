@@ -8,6 +8,7 @@ const Home = () => {
   const navigate = useNavigate();
   const [typedCount, setTypedCount] = useState(0);
   const [isTyping, setIsTyping] = useState(true);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   const fullTitle = 'See The Unusual\nPrevent The\nUnlikely';
   const highlightRanges = [
@@ -33,6 +34,18 @@ const Home = () => {
     }, 70);
 
     return () => clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.style.overflow = 'auto';
+    document.body.style.overflow = 'auto';
+    document.getElementById('root')?.style.setProperty('overflow', 'visible');
+
+    return () => {
+      document.documentElement.style.overflow = '';
+      document.body.style.overflow = '';
+      document.getElementById('root')?.style.removeProperty('overflow');
+    };
   }, []);
 
   const renderTypedText = () => {
@@ -69,6 +82,7 @@ const Home = () => {
     if (section) {
       section.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    setIsMobileNavOpen(false);
   };
 
   return (
@@ -79,13 +93,24 @@ const Home = () => {
           <div className="logo-icon"></div>
           <span>SECUREVISION AI</span>
         </div>
-        <ul className="nav-links">
+        <button
+          className="mobile-nav-toggle"
+          onClick={() => setIsMobileNavOpen((prev) => !prev)}
+          aria-label="Toggle navigation menu"
+          aria-expanded={isMobileNavOpen}
+        >
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <ul className={`home-nav-links ${isMobileNavOpen ? 'open' : ''}`}>
           <li><Link to="/home">Home</Link></li>
           <li><a href="#features" onClick={(event) => handleNavScroll(event, 'features')}>Features</a></li>
           <li><a href="#applications" onClick={(event) => handleNavScroll(event, 'applications')}>Applications</a></li>
           <li><a href="#incidents" onClick={(event) => handleNavScroll(event, 'incidents')}>Incident</a></li>
           <li><Link to="/blog">Blog</Link></li>
           <li><Link to="/contact">Contact Us</Link></li>
+          <li className="mobile-login-link"><Link to="/login">Login</Link></li>
         </ul>
         <Link to="/login" className="nav-login-btn">Login</Link>
       </nav>

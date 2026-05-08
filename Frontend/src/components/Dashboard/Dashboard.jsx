@@ -8,21 +8,22 @@ import {
   Activity,
   Upload,
   Clock,
-  Search,
-  Bell,
-  HelpCircle,
-  ChevronRight,
   LayoutDashboard,
-  FileText,
   BookOpen,
   Settings,
   LogOut,
-  Phone,
-  MessageSquare
+  MessageSquare,
+  Menu,
+  X
 } from "lucide-react";
 import {
   AreaChart,
   Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -39,23 +40,6 @@ const STAT_CARDS = [
   { icon: Activity, label: "System Uptime", value: "99.9%", color: "text-orange" },
 ];
 
-const TREND_DATA = [
-  { date: "Oct 16", anomalies: 2, total: 8 },
-  { date: "Oct 17", anomalies: 1, total: 12 },
-  { date: "Oct 18", anomalies: 4, total: 15 },
-  { date: "Oct 19", anomalies: 2, total: 10 },
-  { date: "Oct 20", anomalies: 5, total: 18 },
-  { date: "Oct 21", anomalies: 3, total: 14 },
-  { date: "Oct 22", anomalies: 7, total: 24 },
-];
-
-const RECENT_ACTIVITY = [
-  { file: "parking_lot_cam4.mp4", status: "abnormal", cls: "Robbery", time: "2 min ago" },
-  { file: "entrance_cam1.mp4", status: "normal", cls: "Normal", time: "15 min ago" },
-  { file: "warehouse_cam2.mp4", status: "abnormal", cls: "Stealing", time: "1 hour ago" },
-  { file: "lobby_cam3.mp4", status: "normal", cls: "Normal", time: "3 hours ago" },
-];
-
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useUser();
@@ -64,11 +48,23 @@ const Dashboard = () => {
     total_analyses: "0",
     anomalies_detected: "0",
     normal_results: "0",
-    system_uptime: "99.9%",
+    anomaly_rate: 0,
   });
   const [activity, setActivity] = useState([]);
   const [trendData, setTrendData] = useState([]);
+  const [intelligence, setIntelligence] = useState({
+    threat_distribution: [],
+    confidence_distribution: [],
+    severity_queue: [],
+    avg_confidence: 0,
+    llm_coverage: 0,
+    llm_generated: 0,
+    total_reports: 0,
+    total_footage_minutes: 0,
+    latest_high_risk: null,
+  });
   const [loadingStats, setLoadingStats] = useState(true);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -76,7 +72,7 @@ const Dashboard = () => {
       if (!token) return;
 
       try {
-        const [statsRes, activityRes, trendRes] = await Promise.all([
+        const [statsRes, activityRes, trendRes, intelligenceRes] = await Promise.all([
           fetch("/api/v1/users/me/stats", {
             headers: { Authorization: `Bearer ${token}` },
           }),
@@ -84,6 +80,9 @@ const Dashboard = () => {
             headers: { Authorization: `Bearer ${token}` },
           }),
           fetch("/api/v1/users/me/trend", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch("/api/v1/users/me/intelligence", {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -100,6 +99,10 @@ const Dashboard = () => {
           const trendData = await trendRes.json();
           setTrendData(trendData);
         }
+        if (intelligenceRes.ok) {
+          const intelligenceData = await intelligenceRes.json();
+          setIntelligence(intelligenceData);
+        }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -114,14 +117,52 @@ const Dashboard = () => {
     { icon: Video, label: "Total Analyses", value: stats.total_analyses.toString(), color: "text-teal" },
     { icon: AlertTriangle, label: "Anomalies Detected", value: stats.anomalies_detected.toString(), color: "text-red" },
     { icon: CheckCircle, label: "Normal Results", value: stats.normal_results.toString(), color: "text-green" },
-    { icon: Activity, label: "System Uptime", value: stats.system_uptime, color: "text-orange" },
+    { icon: Activity, label: "Anomaly Rate", value: `${stats.anomaly_rate ?? 0}%`, color: "text-orange" },
   ];
 
   const userName = user?.full_name || user?.email || '';
   const userAvatar = user?.avatar_url || null;
+  const latestHighRisk = intelligence.latest_high_risk;
+  const chartColors = ["#24606B", "#ff4d4d", "#2ecc71", "#e67e22", "#8e44ad", "#3498db"];
 
   return (
     <div className="dashboard-layout">
+      {mobileMenuOpen && (
+        <div className="dashboard-mobile-menu-overlay" onClick={() => setMobileMenuOpen(false)}>
+          <div className="dashboard-mobile-menu" onClick={(event) => event.stopPropagation()}>
+            <div className="dashboard-mobile-menu-header">
+              <span>SecureVision AI</span>
+              <button className="dashboard-mobile-menu-close" onClick={() => setMobileMenuOpen(false)}>
+                <X size={22} />
+              </button>
+            </div>
+            <nav className="dashboard-mobile-nav">
+              <div className="dashboard-mobile-nav-item active" onClick={() => setMobileMenuOpen(false)}>
+                <LayoutDashboard size={20} /> Dashboard
+              </div>
+              <div className="dashboard-mobile-nav-item" onClick={() => { navigate('/upload'); setMobileMenuOpen(false); }}>
+                <Upload size={20} /> Upload
+              </div>
+              <div className="dashboard-mobile-nav-item" onClick={() => { navigate('/chat'); setMobileMenuOpen(false); }}>
+                <MessageSquare size={20} /> AI Assistant
+              </div>
+              <div className="dashboard-mobile-nav-item" onClick={() => { navigate('/training'); setMobileMenuOpen(false); }}>
+                <BookOpen size={20} /> Training Module
+              </div>
+              <div className="dashboard-mobile-nav-item" onClick={() => { navigate('/reports'); setMobileMenuOpen(false); }}>
+                <Activity size={20} /> Reports
+              </div>
+              <div className="dashboard-mobile-nav-item" onClick={() => { navigate('/settings'); setMobileMenuOpen(false); }}>
+                <Settings size={20} /> Settings
+              </div>
+              <div className="dashboard-mobile-nav-item logout" onClick={() => { navigate('/logout'); setMobileMenuOpen(false); }}>
+                <LogOut size={20} /> Log Out
+              </div>
+            </nav>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-logo" onClick={() => navigate('/dashboard')}>
@@ -148,11 +189,11 @@ const Dashboard = () => {
       <main className="dashboard-main">
         {/* TopBar (Header) */}
         <header className="dashboard-header">
-          <div className="header-spacer"></div>
+          <button className="dashboard-mobile-menu-btn" onClick={() => setMobileMenuOpen(true)}>
+            <Menu size={22} />
+          </button>
 
           <div className="header-actions">
-            <HelpCircle size={22} />
-            <Bell size={22} />
             <div className="user-profile">
               {userAvatar ? (
                 <img src={userAvatar} alt="User" />
@@ -200,55 +241,59 @@ const Dashboard = () => {
                 </h3>
               </div>
               <div className="chart-container-inner">
-                <ResponsiveContainer width="100%" height={240}>
-                  <AreaChart data={trendData.length > 0 ? trendData : TREND_DATA}>
-                    <defs>
-                      <linearGradient id="colorAnomalies" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#ff4d4d" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#ff4d4d" stopOpacity={0} />
-                      </linearGradient>
-                      <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#24606B" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#24606B" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                    <XAxis
-                      dataKey="date"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "#888" }}
-                      dy={10}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "#888" }}
-                    />
-                    <Tooltip
-                      contentStyle={{ backgroundColor: '#0D242C', border: '1px solid #1a3a45', color: '#fff' }}
-                      itemStyle={{ color: '#fff' }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="total"
-                      name="Total Analyses"
-                      stroke="#24606B"
-                      fillOpacity={1}
-                      fill="url(#colorTotal)"
-                      strokeWidth={2}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="anomalies"
-                      name="Anomalies"
-                      stroke="#ff4d4d"
-                      fillOpacity={1}
-                      fill="url(#colorAnomalies)"
-                      strokeWidth={2}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {loadingStats ? (
+                  <div className="chart-loading">Loading trend...</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={240}>
+                    <AreaChart data={trendData}>
+                      <defs>
+                        <linearGradient id="colorAnomalies" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#ff4d4d" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#ff4d4d" stopOpacity={0} />
+                        </linearGradient>
+                        <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#24606B" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#24606B" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                      <XAxis
+                        dataKey="date"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: "#888" }}
+                        dy={10}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: "#888" }}
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#0D242C', border: '1px solid #1a3a45', color: '#fff' }}
+                        itemStyle={{ color: '#fff' }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="total"
+                        name="Total Analyses"
+                        stroke="#24606B"
+                        fillOpacity={1}
+                        fill="url(#colorTotal)"
+                        strokeWidth={2}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="anomalies"
+                        name="Anomalies"
+                        stroke="#ff4d4d"
+                        fillOpacity={1}
+                        fill="url(#colorAnomalies)"
+                        strokeWidth={2}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
 
@@ -264,7 +309,11 @@ const Dashboard = () => {
                   <div className="no-activity">No recent analyses found</div>
                 ) : (
                   activity.map((item, i) => (
-                    <div key={item.id || i} className="activity-item">
+                    <div
+                      key={item.id || i}
+                      className="activity-item"
+                      onClick={() => navigate(`/reports/${item.id}`)}
+                    >
                       <div className="activity-main">
                         <Video size={14} className="activity-icon" />
                         <div className="activity-info">
@@ -286,12 +335,116 @@ const Dashboard = () => {
                   ))
                 )}
               </div>
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="view-all-btn"
-              >
-                View All Reports
-              </button>
+              {activity.length > 0 && (
+                <button
+                  onClick={() => navigate("/reports")}
+                  className="view-all-btn"
+                >
+                  View All Reports
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="intelligence-grid">
+            <div className="intel-card intel-card-large">
+              <div className="card-header">
+                <h3 className="card-title">
+                  <AlertTriangle size={16} className="text-red" />
+                  Threat Class Distribution
+                </h3>
+              </div>
+              <div className="intel-chart">
+                {intelligence.threat_distribution.length === 0 ? (
+                  <div className="chart-empty">No threat data available</div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={intelligence.threat_distribution}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <XAxis dataKey="class_name" tick={{ fontSize: 10, fill: "#777" }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 10, fill: "#777" }} />
+                      <Tooltip />
+                      <Bar dataKey="count" name="Reports" fill="#24606B" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            <div className="intel-card">
+              <div className="card-header">
+                <h3 className="card-title">
+                  <Shield size={16} className="text-teal" />
+                  Confidence Quality
+                </h3>
+              </div>
+              <div className="confidence-summary">
+                <span>Average Confidence</span>
+                <strong>{intelligence.avg_confidence}%</strong>
+              </div>
+              <div className="intel-chart small">
+                <ResponsiveContainer width="100%" height={170}>
+                  <PieChart>
+                    <Pie
+                      data={intelligence.confidence_distribution}
+                      dataKey="count"
+                      nameKey="bucket"
+                      innerRadius={42}
+                      outerRadius={70}
+                      paddingAngle={3}
+                    >
+                      {intelligence.confidence_distribution.map((entry, index) => (
+                        <Cell key={entry.bucket} fill={chartColors[index % chartColors.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+
+          <div className="ops-grid">
+            <div className="ops-card high-risk-card">
+              <p className="ops-label">Latest High-Risk Event</p>
+              {latestHighRisk ? (
+                <>
+                  <h3>{latestHighRisk.top_class}</h3>
+                  <p className="ops-file">{latestHighRisk.filename}</p>
+                  <div className="ops-metrics">
+                    <span>Risk {latestHighRisk.risk_score}%</span>
+                    <span>{(latestHighRisk.confidence * 100).toFixed(1)}% confidence</span>
+                  </div>
+                </>
+              ) : (
+                <p className="ops-empty">No abnormal events detected</p>
+              )}
+            </div>
+
+            <div className="ops-card">
+              <p className="ops-label">Severity Queue</p>
+              <div className="severity-list">
+                {intelligence.severity_queue.map((item) => (
+                  <div key={item.severity} className={`severity-row ${item.severity.toLowerCase()}`}>
+                    <span>{item.severity}</span>
+                    <strong>{item.count}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="ops-card">
+              <p className="ops-label">LLM Report Coverage</p>
+              <h3>{intelligence.llm_coverage}%</h3>
+              <p className="ops-file">
+                {intelligence.llm_generated} of {intelligence.total_reports} reports explained
+              </p>
+            </div>
+
+            <div className="ops-card">
+              <p className="ops-label">Footage Processed</p>
+              <h3>{intelligence.total_footage_minutes} min</h3>
+              <p className="ops-file">Total analyzed video duration</p>
             </div>
           </div>
 

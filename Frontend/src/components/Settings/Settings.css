@@ -168,6 +168,24 @@
   margin: 0;
 }
 
+.settings-mobile-menu-btn,
+.settings-mobile-menu-overlay {
+  display: none;
+}
+
+.settings-mobile-menu-btn {
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(36, 96, 107, 0.16);
+  border-radius: 12px;
+  background: #ffffff;
+  color: #0d242c;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(13, 36, 44, 0.08);
+}
+
 .save-btn {
   background: linear-gradient(135deg, #0d242c, #24606b);
   color: #fff;
@@ -545,5 +563,203 @@
 
   .settings-content {
     padding: 2rem 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .settings-layout {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .settings-sidebar {
+    display: none !important;
+  }
+
+  .settings-content {
+    padding: 1rem;
+    overflow: visible;
+  }
+
+  .settings-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    margin: -1rem -1rem 1rem;
+    padding: 0.85rem 1rem;
+    background: rgba(240, 244, 247, 0.96);
+    backdrop-filter: blur(12px);
+    gap: 1rem;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-left {
+    width: 100%;
+    gap: 0.75rem;
+  }
+
+  .header-left h1 {
+    flex: 1;
+  }
+
+  .back-btn-circle {
+    display: none;
+  }
+
+  .settings-mobile-menu-btn {
+    display: inline-flex;
+    flex-shrink: 0;
+  }
+
+  .settings-mobile-menu-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    justify-content: flex-start;
+    background: rgba(0, 0, 0, 0.48);
+  }
+
+  .settings-mobile-menu {
+    width: min(82vw, 290px);
+    height: 100%;
+    background: #0d242c;
+    color: #fff;
+    box-shadow: 20px 0 60px rgba(0, 0, 0, 0.35);
+    animation: settingsSlideIn 0.25s ease;
+    overflow-y: auto;
+  }
+
+  .settings-mobile-menu-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.35rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    font-weight: 700;
+  }
+
+  .settings-mobile-menu-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    padding: 0.35rem;
+  }
+
+  .settings-mobile-nav {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 0;
+  }
+
+  .settings-mobile-nav-divider {
+    padding: 1rem 1.35rem 0.5rem;
+    color: rgba(255, 255, 255, 0.38);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .settings-mobile-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.95rem 1.35rem;
+    color: rgba(255, 255, 255, 0.72);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .settings-mobile-nav-item:hover,
+  .settings-mobile-nav-item.active {
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    border-left: 3px solid #24606b;
+  }
+
+  .settings-mobile-nav-item.logout {
+    color: #ffb4b4;
+  }
+
+  .settings-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .save-btn {
+    padding: 0.7rem 0.9rem;
+    font-size: 0.78rem;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .settings-section {
+    padding: 1.25rem;
+    border-radius: 16px;
+  }
+
+  .settings-section::before {
+    left: 1.25rem;
+    right: 1.25rem;
+  }
+
+  .profile-upload {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .avatar-preview {
+    width: 84px;
+    height: 84px;
+  }
+
+  .settings-form-grid {
+    gap: 1rem;
+  }
+
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 0.75rem 0.9rem;
+  }
+
+  .danger-zone {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .delete-confirm-actions,
+  .btn-danger {
+    width: 100%;
+    align-items: stretch;
+    justify-content: center;
+  }
+
+  .settings-toast {
+    top: 0.75rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    justify-content: center;
+  }
+}
+
+@keyframes settingsSlideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
   }
 }
