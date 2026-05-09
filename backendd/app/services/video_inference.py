@@ -1,5 +1,6 @@
 # app/services/video_inference.py
 
+import logging
 import math
 import os
 import shutil
@@ -13,6 +14,8 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
+
+from app.core.config import settings
 
 from .model_loader import (
     DEVICE,
@@ -29,6 +32,7 @@ WINDOW_SIZE = 32
 STRIDE = 16
 CHUNK_MINUTES = 30
 TMP_FRAMES_DIR = Path("tmp_frames")
+logger = logging.getLogger(__name__)
 
 
 # ---------- helpers ----------
@@ -55,11 +59,10 @@ def extract_frames_for_chunk(
     Extract frames of one chunk using ffmpeg -ss -t.
     Returns list of frame paths.
     """
-    if TMP_FRAMES_DIR.exists():
-        shutil.rmtree(TMP_FRAMES_DIR, ignore_errors=True)
     TMP_FRAMES_DIR.mkdir(parents=True, exist_ok=True)
 
-    pattern = str(TMP_FRAMES_DIR / "frame_%05d.png")
+    frame_prefix = f"chunk_{int(start_sec * 1000):012d}_frame"
+    pattern = str(TMP_FRAMES_DIR / f"{frame_prefix}_%05d.png")
 
     cmd = [
         "ffmpeg",
@@ -81,7 +84,7 @@ def extract_frames_for_chunk(
         stderr=subprocess.DEVNULL,
     )
 
-    frames = sorted(str(p) for p in TMP_FRAMES_DIR.glob("frame_*.png"))
+    frames = sorted(str(p) for p in TMP_FRAMES_DIR.glob(f"{frame_prefix}_*.png"))
     return frames
 
 
@@ -199,6 +202,96 @@ def collect_anomaly_segments(
     return segments
 
 
+def build_frame_timeline(
+    frame_paths: List[str],
+    fps: float,
+    chunk_start_sec: float,
+) -> List[Tuple[float, str]]:
+    """
+    Given a list of extracted frame file paths in chronological order
+    (as produced by extract_frames_for_chunk), the FPS, and the chunk's
+    start time in seconds, return a list of (time_sec, path) pairs.
+    """
+    if not frame_paths or fps <= 0:
+        return []
+
+    return [
+        (chunk_start_sec + index / fps, path)
+        for index, path in enumerate(frame_paths)
+    ]
+
+
+def sample_keyframes_for_segments(
+    frames_timeline: List[Tuple[float, str]],
+    segments: List[Dict],
+    max_segments: int = 2,
+) -> List[Dict]:
+    """
+    Select a small adaptive set of keyframes for the most confident anomaly segments.
+    """
+    if not frames_timeline:
+        return []
+
+    anomalous_segments = [
+        segment
+        for segment in segments
+        if (segment.get("class_name") or segment.get("classname")) != "Normal"
+    ]
+    if not anomalous_segments:
+        return []
+
+    selected_segments = sorted(
+        anomalous_segments,
+        key=lambda segment: float(segment.get("confidence", 0.0)),
+        reverse=True,
+    )[: min(max_segments, 5)]
+
+    sampled_segments: List[Dict] = []
+
+    for segment in selected_segments:
+        start_time = float(segment.get("start_time_sec", 0.0))
+        end_time = float(segment.get("end_time_sec", start_time))
+        duration = max(0.0, end_time - start_time)
+        base = math.ceil(duration / 10.0) if duration > 0 else 1
+        frames_per_segment = min(max(base, 2), 6)
+
+        if frames_per_segment == 1 or end_time <= start_time:
+            target_times = [start_time]
+        else:
+            step = duration / (frames_per_segment - 1)
+            target_times = [start_time + step * index for index in range(frames_per_segment)]
+
+        keyframes: List[Dict[str, Any]] = []
+        used_paths: set[str] = set()
+
+        for target_time in target_times:
+            closest_time, closest_path = min(
+                frames_timeline,
+                key=lambda item: abs(item[0] - target_time),
+            )
+            if closest_path in used_paths:
+                continue
+            used_paths.add(closest_path)
+            keyframes.append(
+                {
+                    "time_sec": float(closest_time),
+                    "path": closest_path,
+                }
+            )
+
+        sampled_segments.append(
+            {
+                "classname": segment.get("class_name") or segment.get("classname"),
+                "confidence": float(segment.get("confidence", 0.0)),
+                "start_time_sec": start_time,
+                "end_time_sec": end_time,
+                "keyframes": keyframes,
+            }
+        )
+
+    return sampled_segments
+
+
 # ---------- public API ----------
 
 def run_video_inference(
@@ -221,79 +314,115 @@ def run_video_inference(
         "chunk_seconds": chunk_seconds,
         "chunks": [],
     }
+    anomaly_segments: List[Dict[str, Any]] = []
+    frames_timeline: List[Tuple[float, str]] = []
 
-    for chunk_idx in range(num_chunks):
-        start_sec = chunk_idx * chunk_seconds
-        remaining = max(0.0, duration - start_sec)
-        if remaining <= 0:
-            break
-        this_dur = min(chunk_seconds, remaining)
+    try:
+        if TMP_FRAMES_DIR.exists():
+            shutil.rmtree(TMP_FRAMES_DIR, ignore_errors=True)
 
-        frames = extract_frames_for_chunk(video_path, start_sec, this_dur, fps=FPS)
-        embs = frames_to_embeddings(frames)
-        windows = make_windows(embs)
-        window_probs = predict_windows(windows)
+        for chunk_idx in range(num_chunks):
+            start_sec = chunk_idx * chunk_seconds
+            remaining = max(0.0, duration - start_sec)
+            if remaining <= 0:
+                break
+            this_dur = min(chunk_seconds, remaining)
 
-        if window_probs.shape[0] == 0:
-            chunk_overall = {
-                "top_class": "Unknown",
-                "confidence": 0.0,
-            }
-            segments: List[Dict[str, Any]] = []
-        else:
-            avg_prob = window_probs.mean(axis=0)
-            top_idx = int(avg_prob.argmax())
-            chunk_overall = {
-                "top_class": CLASS_NAMES[top_idx],
-                "confidence": float(avg_prob[top_idx]),
-            }
-            segments = collect_anomaly_segments(
-                window_probs,
-                fps=FPS,
-                threshold=conf_threshold,
+            frames = extract_frames_for_chunk(video_path, start_sec, this_dur, fps=FPS)
+            current_timeline = build_frame_timeline(frames, fps=float(FPS), chunk_start_sec=start_sec)
+            frames_timeline.extend(current_timeline)
+            embs = frames_to_embeddings(frames)
+            windows = make_windows(embs)
+            window_probs = predict_windows(windows)
+
+            if window_probs.shape[0] == 0:
+                chunk_overall = {
+                    "top_class": "Unknown",
+                    "confidence": 0.0,
+                }
+                segments: List[Dict[str, Any]] = []
+            else:
+                avg_prob = window_probs.mean(axis=0)
+                top_idx = int(avg_prob.argmax())
+                chunk_overall = {
+                    "top_class": CLASS_NAMES[top_idx],
+                    "confidence": float(avg_prob[top_idx]),
+                }
+                segments = collect_anomaly_segments(
+                    window_probs,
+                    fps=FPS,
+                    threshold=conf_threshold,
+                )
+
+                # shift times by chunk start
+                for seg in segments:
+                    seg["start_time_sec"] += start_sec
+                    seg["end_time_sec"] += start_sec
+                anomaly_segments.extend(segments)
+
+            results["chunks"].append(
+                {
+                    "chunk_index": chunk_idx,
+                    "start_time_sec": start_sec,
+                    "duration_sec": this_dur,
+                    "overall": chunk_overall,
+                    "segments": segments,
+                }
             )
 
-            # shift times by chunk start
-            for seg in segments:
-                seg["start_time_sec"] += start_sec
-                seg["end_time_sec"] += start_sec
+        # simple global summary from all chunks
+        all_chunk_probs: List[Tuple[str, float]] = []
+        for ch in results["chunks"]:
+            all_chunk_probs.append(
+                (ch["overall"]["top_class"], ch["overall"]["confidence"])
+            )
 
-        results["chunks"].append(
-            {
-                "chunk_index": chunk_idx,
-                "start_time_sec": start_sec,
-                "duration_sec": this_dur,
-                "overall": chunk_overall,
-                "segments": segments,
+        if all_chunk_probs:
+            # pick chunk with highest confidence abnormal class, else normal
+            best = max(all_chunk_probs, key=lambda x: x[1])
+            results["overall_summary"] = {
+                "top_class": best[0],
+                "confidence": best[1],
+                "status": "normal"
+                if best[0] == "Normal"
+                else "abnormal",
             }
-        )
+        else:
+            results["overall_summary"] = {
+                "top_class": "Unknown",
+                "confidence": 0.0,
+                "status": "unknown",
+            }
 
-    # simple global summary from all chunks
-    all_chunk_probs: List[Tuple[str, float]] = []
-    for ch in results["chunks"]:
-        all_chunk_probs.append(
-            (ch["overall"]["top_class"], ch["overall"]["confidence"])
-        )
+        if settings.ENABLE_EXPLAINABILITY and anomaly_segments:
+            try:
+                from . import explanation_service
 
-    if all_chunk_probs:
-        # pick chunk with highest confidence abnormal class, else normal
-        best = max(all_chunk_probs, key=lambda x: x[1])
-        results["overall_summary"] = {
-            "top_class": best[0],
-            "confidence": best[1],
-            "status": "normal"
-            if best[0] == "Normal"
-            else "abnormal",
-        }
-    else:
-        results["overall_summary"] = {
-            "top_class": "Unknown",
-            "confidence": 0.0,
-            "status": "unknown",
-        }
+                segment_explanations = explanation_service.build_segment_explanations(
+                    segments=anomaly_segments,
+                    frames_timeline=frames_timeline,
+                    max_segments=5,
+                )
+                from .explainability_assets import persist_segment_explanation_frames
 
-    # cleanup frames
-    if TMP_FRAMES_DIR.exists():
-        shutil.rmtree(TMP_FRAMES_DIR, ignore_errors=True)
+                segment_explanations = persist_segment_explanation_frames(segment_explanations)
+                total_keyframes = sum(
+                    len(segment.get("keyframes", [])) for segment in segment_explanations
+                )
+                logger.info(
+                    "Generated segment_explanations for %s segments and %s keyframes",
+                    len(segment_explanations),
+                    total_keyframes,
+                )
+            except Exception as exc:
+                logger.warning("Segment explainability generation failed: %s", exc)
+                segment_explanations = []
+        else:
+            segment_explanations = []
 
-    return results
+        results["segment_explanations"] = segment_explanations
+        return results
+    finally:
+        # cleanup frames
+        if TMP_FRAMES_DIR.exists():
+            shutil.rmtree(TMP_FRAMES_DIR, ignore_errors=True)

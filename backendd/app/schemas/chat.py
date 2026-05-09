@@ -28,3 +28,4 @@ class ChatThreadDetail(BaseModel):
 
 class ChatMessageCreate(BaseModel):
     content: str
+    report_id: int | None = None

@@ -33,6 +33,14 @@ def create_app() -> FastAPI:
     if videos_path.exists():
         app.mount("/training-videos", StaticFiles(directory=str(videos_path)), name="training-videos")
 
+    explainability_frames_path = Path(__file__).parent.parent / "explainability_frames"
+    explainability_frames_path.mkdir(parents=True, exist_ok=True)
+    app.mount(
+        "/explainability-frames",
+        StaticFiles(directory=str(explainability_frames_path)),
+        name="explainability-frames",
+    )
+
     app.include_router(health.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(users.router, prefix="/api/v1")

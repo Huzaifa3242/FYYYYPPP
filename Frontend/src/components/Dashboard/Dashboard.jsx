@@ -14,7 +14,8 @@ import {
   LogOut,
   MessageSquare,
   Menu,
-  X
+  X,
+  FileText
 } from "lucide-react";
 import {
   AreaChart,
@@ -146,6 +147,9 @@ const Dashboard = () => {
               <div className="dashboard-mobile-nav-item" onClick={() => { navigate('/chat'); setMobileMenuOpen(false); }}>
                 <MessageSquare size={20} /> AI Assistant
               </div>
+              <div className="dashboard-mobile-nav-item" onClick={() => { navigate('/reports'); setMobileMenuOpen(false); }}>
+                <FileText size={20} /> Reports
+              </div>
               <div className="dashboard-mobile-nav-item" onClick={() => { navigate('/training'); setMobileMenuOpen(false); }}>
                 <BookOpen size={20} /> Training Module
               </div>
@@ -176,6 +180,9 @@ const Dashboard = () => {
           <div className="nav-item" onClick={() => navigate('/chat')}>
             <MessageSquare size={20} /> AI Assistant
           </div>
+          <div className="nav-item" onClick={() => navigate('/reports')}>
+            <FileText size={20} /> Reports
+          </div>
           <div className="nav-item" onClick={() => navigate('/training')}>
             <BookOpen size={20} /> Training Module
           </div>
@@ -193,6 +200,8 @@ const Dashboard = () => {
             <Menu size={22} />
           </button>
 
+          <h1 className="page-title header-page-title">Dashboard</h1>
+
           <div className="header-actions">
             <div className="user-profile">
               {userAvatar ? (
@@ -209,8 +218,6 @@ const Dashboard = () => {
         </header>
 
         <div className="dashboard-content">
-          <h1 className="page-title">Dashboard</h1>
-
           {/* Stats grid */}
           <div className="stats-grid">
             {dynamicStatCards.map((s) => {

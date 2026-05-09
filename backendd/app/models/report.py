@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
+from sqlalchemy import Column, JSON
 from sqlmodel import SQLModel, Field
 
 class AnalysisReport(SQLModel, table=True):
@@ -11,4 +12,5 @@ class AnalysisReport(SQLModel, table=True):
     confidence: float
     duration_sec: float
     llm_report: Optional[str] = None
+    segment_explanations: Optional[list[dict]] = Field(default=None, sa_column=Column(JSON, nullable=True))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), nullable=False)

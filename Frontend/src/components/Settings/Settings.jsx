@@ -245,8 +245,8 @@ const Settings = () => {
               <div className="settings-mobile-nav-item" onClick={() => { navigate('/dashboard'); setMobileMenuOpen(false); }}><LayoutDashboard size={20} /> Dashboard</div>
               <div className="settings-mobile-nav-item" onClick={() => { navigate('/upload'); setMobileMenuOpen(false); }}><Upload size={20} /> Upload</div>
               <div className="settings-mobile-nav-item" onClick={() => { navigate('/chat'); setMobileMenuOpen(false); }}><MessageSquare size={20} /> AI Assistant</div>
-              <div className="settings-mobile-nav-item" onClick={() => { navigate('/training'); setMobileMenuOpen(false); }}><BookOpen size={20} /> Training Module</div>
               <div className="settings-mobile-nav-item" onClick={() => { navigate('/reports'); setMobileMenuOpen(false); }}><FileText size={20} /> Reports</div>
+              <div className="settings-mobile-nav-item" onClick={() => { navigate('/training'); setMobileMenuOpen(false); }}><BookOpen size={20} /> Training Module</div>
               <div className="settings-mobile-nav-item active" onClick={() => setMobileMenuOpen(false)}><SettingsIcon size={20} /> Settings</div>
               <div className="settings-mobile-nav-divider">Settings Sections</div>
               {tabs.map(tab => (
@@ -294,6 +294,14 @@ const Settings = () => {
           <div className="settings-nav-item" onClick={() => navigate('/dashboard')}>
             <LayoutDashboard size={20} />
             <span>Dashboard</span>
+          </div>
+          <div className="settings-nav-item" onClick={() => navigate('/chat')}>
+            <MessageSquare size={20} />
+            <span>AI Assistant</span>
+          </div>
+          <div className="settings-nav-item" onClick={() => navigate('/reports')}>
+            <FileText size={20} />
+            <span>Reports</span>
           </div>
           <div className="settings-nav-item logout" onClick={() => navigate('/logout')}>
             <LogOut size={20} />

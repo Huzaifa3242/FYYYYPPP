@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Send, 
@@ -10,7 +10,9 @@ import {
   HelpCircle,
   Trash2,
   ChevronDown,
-  Brain
+  Brain,
+  X,
+  FileText
 } from 'lucide-react';
 import './Chat.css';
 
@@ -86,6 +88,8 @@ const Chat = () => {
   const [activeThreadId, setActiveThreadId] = useState(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [contextReportId, setContextReportId] = useState(null);
+  const location = useLocation();
   const messagesRef = useRef(null);
 
   const formatTime = (value) => new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -97,6 +101,17 @@ const Chat = () => {
     return title.includes(query);
   });
 
+  const getAuthHeaders = (includeJson = false) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      navigate('/login');
+      return null;
+    }
+    return includeJson
+      ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+      : { Authorization: `Bearer ${token}` };
+  };
+
   const mapApiMessages = (items) => items.map((msg) => ({
     id: msg.id,
     sender: msg.role === 'assistant' ? 'ai' : 'user',
@@ -105,13 +120,17 @@ const Chat = () => {
   }));
 
   const fetchThreads = async () => {
-    const response = await fetch(`${API_BASE}/chat/threads`);
+    const headers = getAuthHeaders();
+    if (!headers) return [];
+    const response = await fetch(`${API_BASE}/chat/threads`, { headers });
     if (!response.ok) return [];
     return response.json();
   };
 
   const loadThread = async (threadId) => {
-    const response = await fetch(`${API_BASE}/chat/threads/${threadId}`);
+    const headers = getAuthHeaders();
+    if (!headers) return;
+    const response = await fetch(`${API_BASE}/chat/threads/${threadId}`, { headers });
     if (!response.ok) return;
     const data = await response.json();
     setActiveThreadId(threadId);
@@ -121,9 +140,11 @@ const Chat = () => {
   };
 
   const createThread = async () => {
+    const headers = getAuthHeaders(true);
+    if (!headers) return null;
     const response = await fetch(`${API_BASE}/chat/threads`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ title: null }),
     });
     if (!response.ok) return null;
@@ -143,7 +164,9 @@ const Chat = () => {
 
   const handleDeleteThread = async (event, threadId) => {
     event.stopPropagation();
-    await fetch(`${API_BASE}/chat/threads/${threadId}`, { method: 'DELETE' });
+    const headers = getAuthHeaders();
+    if (!headers) return;
+    await fetch(`${API_BASE}/chat/threads/${threadId}`, { method: 'DELETE', headers });
     const list = await refreshThreads();
 
     if (threadId === activeThreadId) {
@@ -175,6 +198,9 @@ const Chat = () => {
     }
     if (!threadId) return;
 
+    const headers = getAuthHeaders(true);
+    if (!headers) return;
+
     if (isInitial) setIsInitial(false);
 
     const userMessage = {
@@ -198,8 +224,11 @@ const Chat = () => {
 
     const response = await fetch(`${API_BASE}/chat/threads/${threadId}/messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: userMessage.text }),
+      headers,
+      body: JSON.stringify({ 
+        content: userMessage.text,
+        report_id: contextReportId 
+      }),
     });
     console.log(`[CHAT_TIMING][FE] response_received_ms=${Math.round(performance.now() - requestStartedAt)}`);
 
@@ -295,13 +324,26 @@ const Chat = () => {
 
   useEffect(() => {
     const init = async () => {
+      const params = new URLSearchParams(location.search);
+      const rid = params.get('reportId');
+      
+      if (rid) {
+        // We have a report context: start a fresh chat
+        setContextReportId(parseInt(rid, 10));
+        setActiveThreadId(null);
+        setMessages([]);
+        setIsInitial(true);
+      }
+
       const list = await refreshThreads();
-      if (list.length > 0) {
+      
+      // Only auto-load the latest thread if we AREN'T coming from a specific report
+      if (list.length > 0 && !rid && !activeThreadId) {
         await loadThread(list[0].id);
       }
     };
     init();
-  }, []);
+  }, [location.search]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -381,6 +423,9 @@ const Chat = () => {
           <div className="nav-link-item bottom-item" onClick={() => { navigate('/dashboard'); if (window.innerWidth <= 720) setIsSidebarOpen(false); }}>
             <LayoutDashboard size={18} /> Dashboard
           </div>
+          <div className="nav-link-item bottom-item" onClick={() => { navigate('/reports'); if (window.innerWidth <= 720) setIsSidebarOpen(false); }}>
+            <FileText size={18} /> Reports
+          </div>
           <div className="nav-link-item bottom-item" onClick={() => { navigate('/settings'); if (window.innerWidth <= 720) setIsSidebarOpen(false); }}>
             <Settings size={18} /> Settings
           </div>
@@ -437,6 +482,14 @@ const Chat = () => {
                 <span className="topbar-brand">SecureVision AI</span>
               </div>
               <div className="top-bar-right">
+                {contextReportId && (
+                  <div className="context-badge">
+                    <Brain size={14} /> Context Active
+                    <button className="clear-context" onClick={() => setContextReportId(null)} title="Clear report context">
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
                 <button className="icon-action" aria-label="Search">
                   <Search size={18} />
                 </button>

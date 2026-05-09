@@ -130,6 +130,10 @@ async def predict_video(
 
             duration_sec=result.get("duration_sec", 0),
 
+            llm_report=llm_report,
+
+            segment_explanations=result.get("segment_explanations") or None,
+
         )
 
         session.add(report_record)

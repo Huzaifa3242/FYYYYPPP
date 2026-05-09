@@ -84,12 +84,15 @@ def delete_account(
     session: Session = Depends(get_session),
 ):
     # Delete all chat messages & threads owned by this user
-    # (since chats are not user-scoped in the current schema, we delete ALL;
-    #  adjust if you add a user_id FK to ChatThread later)
-    threads = session.exec(select(ChatThread)).all()
+    # Legacy global chat rows with NULL user_id are intentionally left inaccessible.
+    threads = session.exec(
+        select(ChatThread).where(ChatThread.user_id == current_user.id)
+    ).all()
     for thread in threads:
         msgs = session.exec(
-            select(ChatMessage).where(ChatMessage.thread_id == thread.id)
+            select(ChatMessage)
+            .where(ChatMessage.thread_id == thread.id)
+            .where(ChatMessage.user_id == current_user.id)
         ).all()
         for msg in msgs:
             session.delete(msg)

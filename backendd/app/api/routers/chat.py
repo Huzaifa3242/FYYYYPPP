@@ -12,9 +12,12 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from groq import Groq
 
+from app.api.deps import get_current_user
 from app.core.config import settings
 from app.db.session import get_session
 from app.models.chat import ChatMessage, ChatThread
+from app.models.report import AnalysisReport
+from app.models.user import User
 from app.schemas.chat import (
     ChatMessageCreate,
     ChatMessageRead,
@@ -58,6 +61,7 @@ def _trim_messages_for_context(messages: list[ChatMessage]) -> list[ChatMessage]
             ChatMessage(
                 id=msg.id,
                 thread_id=msg.thread_id,
+                user_id=msg.user_id,
                 role=msg.role,
                 content=content,
                 created_at=msg.created_at,
@@ -112,9 +116,24 @@ def _thread_to_read(thread: ChatThread, last_message: str | None) -> ChatThreadR
     )
 
 
+def _get_owned_thread(thread_id: int, user_id: int, session: Session) -> ChatThread:
+    thread = session.exec(
+        select(ChatThread)
+        .where(ChatThread.id == thread_id)
+        .where(ChatThread.user_id == user_id)
+    ).first()
+    if not thread:
+        raise HTTPException(status_code=404, detail="Thread not found")
+    return thread
+
+
 @router.post("/threads", response_model=ChatThreadRead, status_code=201)
-def create_thread(payload: ChatThreadCreate, session: Session = Depends(get_session)):
-    thread = ChatThread(title=payload.title)
+def create_thread(
+    payload: ChatThreadCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    thread = ChatThread(title=payload.title, user_id=current_user.id)
     session.add(thread)
     session.commit()
     session.refresh(thread)
@@ -122,13 +141,21 @@ def create_thread(payload: ChatThreadCreate, session: Session = Depends(get_sess
 
 
 @router.get("/threads", response_model=list[ChatThreadRead])
-def list_threads(session: Session = Depends(get_session)):
-    threads = session.exec(select(ChatThread).order_by(ChatThread.updated_at.desc())).all()
+def list_threads(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    threads = session.exec(
+        select(ChatThread)
+        .where(ChatThread.user_id == current_user.id)
+        .order_by(ChatThread.updated_at.desc())
+    ).all()
     results: list[ChatThreadRead] = []
     for thread in threads:
         last = session.exec(
             select(ChatMessage)
             .where(ChatMessage.thread_id == thread.id)
+            .where(ChatMessage.user_id == current_user.id)
             .order_by(ChatMessage.created_at.desc())
         ).first()
         last_message = last.content if last else None
@@ -137,14 +164,17 @@ def list_threads(session: Session = Depends(get_session)):
 
 
 @router.get("/threads/{thread_id}", response_model=ChatThreadDetail)
-def get_thread(thread_id: int, session: Session = Depends(get_session)):
-    thread = session.get(ChatThread, thread_id)
-    if not thread:
-        raise HTTPException(status_code=404, detail="Thread not found")
+def get_thread(
+    thread_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    thread = _get_owned_thread(thread_id, current_user.id, session)
 
     messages = session.exec(
         select(ChatMessage)
         .where(ChatMessage.thread_id == thread_id)
+        .where(ChatMessage.user_id == current_user.id)
         .order_by(ChatMessage.created_at)
     ).all()
 
@@ -164,13 +194,17 @@ def get_thread(thread_id: int, session: Session = Depends(get_session)):
 
 
 @router.delete("/threads/{thread_id}", status_code=204)
-def delete_thread(thread_id: int, session: Session = Depends(get_session)):
-    thread = session.get(ChatThread, thread_id)
-    if not thread:
-        raise HTTPException(status_code=404, detail="Thread not found")
+def delete_thread(
+    thread_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    thread = _get_owned_thread(thread_id, current_user.id, session)
 
     messages = session.exec(
-        select(ChatMessage).where(ChatMessage.thread_id == thread_id)
+        select(ChatMessage)
+        .where(ChatMessage.thread_id == thread_id)
+        .where(ChatMessage.user_id == current_user.id)
     ).all()
     for msg in messages:
         session.delete(msg)
@@ -182,17 +216,17 @@ def delete_thread(thread_id: int, session: Session = Depends(get_session)):
 def create_message_stream(
     thread_id: int,
     payload: ChatMessageCreate,
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
     request_started_at = time.perf_counter()
     _require_any_chat_provider()
 
-    thread = session.get(ChatThread, thread_id)
-    if not thread:
-        raise HTTPException(status_code=404, detail="Thread not found")
+    thread = _get_owned_thread(thread_id, current_user.id, session)
 
     user_message = ChatMessage(
         thread_id=thread_id,
+        user_id=current_user.id,
         role="user",
         content=payload.content,
         created_at=_utc_now(),
@@ -208,21 +242,51 @@ def create_message_stream(
     recent_messages = session.exec(
         select(ChatMessage)
         .where(ChatMessage.thread_id == thread_id)
+        .where(ChatMessage.user_id == current_user.id)
         .order_by(ChatMessage.created_at.desc())
         .limit(settings.CHAT_CONTEXT_MESSAGES)
     ).all()
     messages = _trim_messages_for_context(list(reversed(recent_messages)))
 
+    report_context = ""
+    if payload.report_id:
+        logger.info("[CHAT_CONTEXT] Fetching report_id=%s for user_id=%s", payload.report_id, current_user.id)
+        report = session.get(AnalysisReport, payload.report_id)
+        if report and report.user_id == current_user.id:
+            # Format report findings for the LLM
+            findings = []
+            if report.segment_explanations:
+                for seg in report.segment_explanations:
+                    cls = seg.get("classname", "Unknown")
+                    kfs = seg.get("keyframes", [])
+                    for kf in kfs:
+                        cap = kf.get("caption", "No description")
+                        time_s = kf.get("time_sec", 0)
+                        findings.append(f"- At {time_s}s: {cls} situation. Visuals: {cap}")
+            
+            report_context = (
+                f"\n\nIMPORTANT CONTEXT: THE USER IS ASKING ABOUT A SPECIFIC DETECTED INCIDENT.\n"
+                f"INCIDENT DETAILS:\n"
+                f"- File: {report.filename}\n"
+                f"- Classification: {report.top_class}\n"
+                f"- Confidence Score: {report.confidence * 100:.1f}%\n"
+                f"- Visual Timeline Events:\n" + ("\n".join(findings) if findings else "No specific visual timeline details available.") +
+                f"\n\nINSTRUCTION: When answering, refer to the specific details above to explain what happened in this video."
+            )
+            logger.info("[CHAT_CONTEXT] Successfully injected context for report=%s (%s findings)", report.id, len(findings))
+        else:
+            logger.warning("[CHAT_CONTEXT] Report report_id=%s not found or not owned by user_id=%s", payload.report_id, current_user.id)
+
     system_prompt = (
         "You are a helpful security and crime-prevention assistant. "
-        "You are SecureVision AI "
+        "You are SecureVision AI. "
         "Never claim to be Google, Gemini, or any other provider. "
         "If asked about identity, say you are SecureVision AI. "
         "Keep answers concise by default (about 60-100 words) unless the user asks for detail. "
         "You answer questions about crime situations detected from CCTV video. "
         "Explain clearly and avoid technical ML details. "
-        "Donot talk extra just keep it concise untill user ask anything"
-        # "/no_think"
+        "Do not talk extra, just keep it concise until the user asks for more information."
+        + report_context
     )
 
     def event_stream() -> Iterable[str]:
@@ -244,6 +308,14 @@ def create_message_stream(
             groq_messages = [
                 {"role": "system", "content": system_prompt},
             ]
+            
+            # If we have a report context and it's a NEW chat (no messages yet except the system prompt),
+            # we can prime the model to be aware of the context.
+            if report_context and len(messages) <= 1:
+                # Add a hidden sequence that primes the model
+                groq_messages.append({"role": "user", "content": "I am asking about the report context provided in the system prompt."})
+                groq_messages.append({"role": "assistant", "content": "I have the analysis report context ready. I can see the detection results and visual timeline for this video. What would you like to know about it?"})
+
             for msg in messages:
                 content = msg.content
                 if msg.role == "assistant":
@@ -318,6 +390,7 @@ def create_message_stream(
         full_text = _sanitize_identity_claims(full_text)
         assistant_message = ChatMessage(
             thread_id=thread_id,
+            user_id=current_user.id,
             role="assistant",
             content=full_text,
             created_at=_utc_now(),

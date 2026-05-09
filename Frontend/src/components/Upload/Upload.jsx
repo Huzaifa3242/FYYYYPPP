@@ -162,11 +162,11 @@ const Upload = () => {
               <div className="upload-mobile-nav-item" onClick={() => { navigate('/chat'); setMobileMenuOpen(false); }}>
                 <MessageSquare size={20} /> AI Assistant
               </div>
-              <div className="upload-mobile-nav-item" onClick={() => { navigate('/training'); setMobileMenuOpen(false); }}>
-                <BookOpen size={20} /> Training Module
-              </div>
               <div className="upload-mobile-nav-item" onClick={() => { navigate('/reports'); setMobileMenuOpen(false); }}>
                 <FileText size={20} /> Reports
+              </div>
+              <div className="upload-mobile-nav-item" onClick={() => { navigate('/training'); setMobileMenuOpen(false); }}>
+                <BookOpen size={20} /> Training Module
               </div>
               <div className="upload-mobile-nav-item" onClick={() => { navigate('/settings'); setMobileMenuOpen(false); }}>
                 <Settings size={20} /> Settings
@@ -191,6 +191,7 @@ const Upload = () => {
           <Link to="/dashboard">Dashboard</Link>
           <Link to="/upload" className="active">Upload</Link>
           <Link to="/chat">Chat</Link>
+          <Link to="/reports">Reports</Link>
           <Link to="/training">Training</Link>
         </div>
       </nav>

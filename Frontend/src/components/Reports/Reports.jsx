@@ -16,8 +16,158 @@ import {
   Upload,
   Video,
   X,
+  ZoomIn,
 } from "lucide-react";
 import "./Reports.css";
+
+const formatTimelineTime = (value) => `${Math.round(Number(value) || 0)}s`;
+
+const normalizeFramePath = (path) => {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("/")) {
+    return path;
+  }
+  return `/${path.replace(/^\/+/, "")}`;
+};
+
+const displayKeyframeCaption = (caption) => {
+  if (!caption) return "Caption not generated for this keyframe.";
+  if (caption.includes("HF_API_TOKEN") || caption.includes("caption service error")) {
+    return caption;
+  }
+  return caption;
+};
+
+// Reports detail reads duration_sec and segment_explanations from /api/v1/users/me/reports/{id}; keyframe paths are expected to be backend-served URLs such as /explainability-frames/{file}.
+const ExplainabilityTimeline = ({
+  durationSec,
+  segmentExplanations,
+  activeSegmentIndex,
+  onActiveSegmentChange,
+  selectedKeyframe,
+  onSelectedKeyframeChange,
+}) => {
+  const duration = Math.max(Number(durationSec) || 0, 1);
+
+  if (!Array.isArray(segmentExplanations) || segmentExplanations.length === 0) {
+    return (
+      <section className="explainability-section">
+        <div className="explainability-header">
+          <div>
+            <p className="eyebrow">Visual evidence</p>
+            <h3>Explainability timeline</h3>
+          </div>
+        </div>
+        <p className="explainability-empty">Explainability data is not available for this incident.</p>
+      </section>
+    );
+  }
+
+  const keyframes = segmentExplanations.flatMap((segment, segmentIndex) =>
+    (segment.keyframes || []).map((keyframe, keyframeIndex) => ({
+      ...keyframe,
+      segment,
+      segmentIndex,
+      keyframeIndex,
+      key: `${segmentIndex}-${keyframeIndex}`,
+    }))
+  );
+
+  return (
+    <section className="explainability-section">
+      <div className="explainability-header">
+        <div>
+          <p className="eyebrow">Visual evidence</p>
+          <h3>Explainability timeline</h3>
+        </div>
+        <span>{formatTimelineTime(durationSec)} total</span>
+      </div>
+
+      <div className="timeline-axis" aria-label="Explainability timeline">
+        <span className="timeline-label start">0s</span>
+        <span className="timeline-label end">{formatTimelineTime(durationSec)}</span>
+        {segmentExplanations.map((segment, index) => {
+          const start = Math.max(0, Number(segment.start_time_sec) || 0);
+          const end = Math.max(start, Number(segment.end_time_sec) || start);
+          const left = Math.min(100, (start / duration) * 100);
+          const width = Math.max(2, Math.min(100 - left, ((end - start) / duration) * 100));
+
+          return (
+            <button
+              key={`${segment.classname}-${index}`}
+              type="button"
+              className={`timeline-segment ${activeSegmentIndex === index ? "active" : ""}`}
+              style={{ left: `${left}%`, width: `${width}%` }}
+              onMouseEnter={() => onActiveSegmentChange(index)}
+              onFocus={() => onActiveSegmentChange(index)}
+              onMouseLeave={() => onActiveSegmentChange(null)}
+              onBlur={() => onActiveSegmentChange(null)}
+              title={`${segment.classname} ${formatTimelineTime(start)}-${formatTimelineTime(end)}`}
+            >
+              <span>{segment.classname}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="keyframe-grid">
+        {keyframes.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={`keyframe-card ${activeSegmentIndex === item.segmentIndex ? "active" : ""}`}
+            onMouseEnter={() => onActiveSegmentChange(item.segmentIndex)}
+            onFocus={() => onActiveSegmentChange(item.segmentIndex)}
+            onMouseLeave={() => onActiveSegmentChange(null)}
+            onBlur={() => onActiveSegmentChange(null)}
+            onClick={() => onSelectedKeyframeChange(item)}
+          >
+            <div className="keyframe-thumb-wrap">
+              <img src={normalizeFramePath(item.path)} alt={`Keyframe at ${formatTimelineTime(item.time_sec)}`} />
+              <span><ZoomIn size={14} /> {formatTimelineTime(item.time_sec)}</span>
+            </div>
+            <div className="keyframe-copy">
+              <strong>{item.segment.classname}</strong>
+              <p>{displayKeyframeCaption(item.caption)}</p>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {selectedKeyframe && (
+        <div className="keyframe-detail-panel">
+          <div className="keyframe-detail-image">
+            <img
+              src={normalizeFramePath(selectedKeyframe.path)}
+              alt={`Selected keyframe at ${formatTimelineTime(selectedKeyframe.time_sec)}`}
+            />
+          </div>
+          <div className="keyframe-detail-copy">
+            <div className="keyframe-detail-top">
+              <div>
+                <p className="eyebrow">Selected keyframe</p>
+                <h4>{selectedKeyframe.segment.classname}</h4>
+              </div>
+              <button type="button" onClick={() => onSelectedKeyframeChange(null)}>Close</button>
+            </div>
+            <p>{displayKeyframeCaption(selectedKeyframe.caption)}</p>
+            <div className="keyframe-meta-grid">
+              <span>Time: <strong>{formatTimelineTime(selectedKeyframe.time_sec)}</strong></span>
+              <span>Confidence: <strong>{((Number(selectedKeyframe.segment.confidence) || 0) * 100).toFixed(1)}%</strong></span>
+              <span>
+                Segment: <strong>{formatTimelineTime(selectedKeyframe.segment.start_time_sec)} - {formatTimelineTime(selectedKeyframe.segment.end_time_sec)}</strong>
+              </span>
+            </div>
+            <div className="ai-explanation-placeholder">
+              <h5>AI explanation</h5>
+              <p>LLM-based explanation will be added here later.</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+};
 
 const Reports = () => {
   const navigate = useNavigate();
@@ -27,6 +177,8 @@ const Reports = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeExplainabilitySegment, setActiveExplainabilitySegment] = useState(null);
+  const [selectedExplainabilityKeyframe, setSelectedExplainabilityKeyframe] = useState(null);
 
   useEffect(() => {
     const fetchReports = async () => {
@@ -57,6 +209,8 @@ const Reports = () => {
         if (reportId) {
           setSelectedReport(data);
           setReports([]);
+          setActiveExplainabilitySegment(null);
+          setSelectedExplainabilityKeyframe(null);
         } else {
           setReports(Array.isArray(data) ? data : []);
           setSelectedReport(null);
@@ -142,7 +296,15 @@ const Reports = () => {
             <h2>{selectedReport.filename}</h2>
             <p className="detail-date">{new Date(selectedReport.created_at).toLocaleString()}</p>
           </div>
-          <span className={`report-status ${selectedReport.status}`}>{selectedReport.status}</span>
+          <div className="report-header-actions">
+            <button 
+              className="chat-report-btn"
+              onClick={() => navigate(`/chat?reportId=${selectedReport.id}`)}
+            >
+              <MessageSquare size={16} /> Chat about this report
+            </button>
+            <span className={`report-status ${selectedReport.status}`}>{selectedReport.status}</span>
+          </div>
         </div>
 
         <div className="detail-stats-grid">
@@ -161,40 +323,28 @@ const Reports = () => {
         </div>
 
         <div className="markdown-report">
-          <h3>LLM Generated Report</h3>
+          <h3>Security Analysis Report</h3>
           {selectedReport.llm_report ? (
             <ReactMarkdown>{selectedReport.llm_report}</ReactMarkdown>
           ) : (
             <p>No LLM report was generated for this analysis.</p>
           )}
         </div>
+
+        <ExplainabilityTimeline
+          durationSec={selectedReport.duration_sec}
+          segmentExplanations={selectedReport.segment_explanations}
+          activeSegmentIndex={activeExplainabilitySegment}
+          onActiveSegmentChange={setActiveExplainabilitySegment}
+          selectedKeyframe={selectedExplainabilityKeyframe}
+          onSelectedKeyframeChange={setSelectedExplainabilityKeyframe}
+        />
       </div>
     );
   };
 
   return (
     <div className="reports-layout">
-      {mobileMenuOpen && (
-        <div className="reports-mobile-menu-overlay" onClick={() => setMobileMenuOpen(false)}>
-          <div className="reports-mobile-menu" onClick={(event) => event.stopPropagation()}>
-            <div className="reports-mobile-menu-header">
-              <span>SecureVision AI</span>
-              <button className="reports-mobile-menu-close" onClick={() => setMobileMenuOpen(false)}>
-                <X size={22} />
-              </button>
-            </div>
-            <nav className="reports-mobile-nav">
-              <div className="reports-mobile-nav-item" onClick={() => { navigate("/dashboard"); setMobileMenuOpen(false); }}><LayoutDashboard size={20} /> Dashboard</div>
-              <div className="reports-mobile-nav-item" onClick={() => { navigate("/upload"); setMobileMenuOpen(false); }}><Upload size={20} /> Upload</div>
-              <div className="reports-mobile-nav-item" onClick={() => { navigate("/chat"); setMobileMenuOpen(false); }}><MessageSquare size={20} /> AI Assistant</div>
-              <div className="reports-mobile-nav-item" onClick={() => { navigate("/training"); setMobileMenuOpen(false); }}><BookOpen size={20} /> Training Module</div>
-              <div className="reports-mobile-nav-item active" onClick={() => setMobileMenuOpen(false)}><FileText size={20} /> Reports</div>
-              <div className="reports-mobile-nav-item" onClick={() => { navigate("/settings"); setMobileMenuOpen(false); }}><Settings size={20} /> Settings</div>
-              <div className="reports-mobile-nav-item logout" onClick={() => { navigate("/logout"); setMobileMenuOpen(false); }}><LogOut size={20} /> Log Out</div>
-            </nav>
-          </div>
-        </div>
-      )}
       <aside className="sidebar">
         <div className="sidebar-logo" onClick={() => navigate("/dashboard")}>
           <div className="logo-square"></div>
@@ -204,8 +354,8 @@ const Reports = () => {
           <div className="nav-item" onClick={() => navigate("/dashboard")}><LayoutDashboard size={20} /> Dashboard</div>
           <div className="nav-item" onClick={() => navigate("/upload")}><Upload size={20} /> Upload</div>
           <div className="nav-item" onClick={() => navigate("/chat")}><MessageSquare size={20} /> AI Assistant</div>
-          <div className="nav-item" onClick={() => navigate("/training")}><BookOpen size={20} /> Training Module</div>
           <div className="nav-item active"><FileText size={20} /> Reports</div>
+          <div className="nav-item" onClick={() => navigate("/training")}><BookOpen size={20} /> Training Module</div>
           <div className="nav-item" onClick={() => navigate("/settings")}><Settings size={20} /> Settings</div>
           <div className="nav-item logout-nav" onClick={() => navigate("/logout")}><LogOut size={20} /> Log Out</div>
         </nav>
@@ -213,9 +363,6 @@ const Reports = () => {
 
       <main className="reports-main">
         <header className="reports-header">
-          <button className="reports-mobile-menu-btn" onClick={() => setMobileMenuOpen(true)}>
-            <Menu size={22} />
-          </button>
           <div>
             <h1>{reportId ? "Report Details" : "All Reports"}</h1>
             <p>Review generated video anomaly analysis reports.</p>

@@ -14,7 +14,8 @@ import {
   MessageSquare,
   RefreshCw,
   Menu,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 import './Training.css';
 import { useUser } from '../../context/UserContext';
@@ -232,6 +233,9 @@ const Training = () => {
               <div className="mobile-nav-item" onClick={() => { navigate('/chat'); setMobileMenuOpen(false); }}>
                 <MessageSquare size={20} /> AI Assistant
               </div>
+              <div className="mobile-nav-item" onClick={() => { navigate('/reports'); setMobileMenuOpen(false); }}>
+                <FileText size={20} /> Reports
+              </div>
               <div className="mobile-nav-item active" onClick={() => setMobileMenuOpen(false)}>
                 <BookOpen size={20} /> Training Module
               </div>
@@ -261,6 +265,9 @@ const Training = () => {
           </div>
           <div className="nav-item" onClick={() => navigate('/chat')}>
             <MessageSquare size={20} /> AI Assistant
+          </div>
+          <div className="nav-item" onClick={() => navigate('/reports')}>
+            <FileText size={20} /> Reports
           </div>
           <div className="nav-item active">
             <BookOpen size={20} /> Training Module

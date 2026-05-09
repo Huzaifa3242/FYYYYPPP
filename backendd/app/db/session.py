@@ -31,6 +31,11 @@ def init_db() -> None:
 
     with engine.begin() as connection:
         connection.execute(text("ALTER TABLE analysisreport ADD COLUMN IF NOT EXISTS llm_report TEXT"))
+        connection.execute(text("ALTER TABLE analysisreport ADD COLUMN IF NOT EXISTS segment_explanations JSON"))
+        connection.execute(text("ALTER TABLE chatthread ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES \"user\"(id)"))
+        connection.execute(text("ALTER TABLE chatmessage ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES \"user\"(id)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_chatthread_user_id ON chatthread (user_id)"))
+        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_chatmessage_user_id ON chatmessage (user_id)"))
 
 
 
