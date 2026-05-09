@@ -224,7 +224,8 @@ def build_frame_timeline(
 def sample_keyframes_for_segments(
     frames_timeline: List[Tuple[float, str]],
     segments: List[Dict],
-    max_segments: int = 2,
+    max_segments: int = 4,
+    total_hard_cap: int = 80,
 ) -> List[Dict]:
     """
     Select a small adaptive set of keyframes for the most confident anomaly segments.
@@ -244,7 +245,7 @@ def sample_keyframes_for_segments(
         anomalous_segments,
         key=lambda segment: float(segment.get("confidence", 0.0)),
         reverse=True,
-    )[: min(max_segments, 5)]
+    )[:max_segments]
 
     sampled_segments: List[Dict] = []
 
@@ -252,8 +253,8 @@ def sample_keyframes_for_segments(
         start_time = float(segment.get("start_time_sec", 0.0))
         end_time = float(segment.get("end_time_sec", start_time))
         duration = max(0.0, end_time - start_time)
-        base = math.ceil(duration / 10.0) if duration > 0 else 1
-        frames_per_segment = min(max(base, 2), 6)
+        base = math.ceil(duration / 4.0) if duration > 0 else 1
+        frames_per_segment = min(max(base, 4), 20)
 
         if frames_per_segment == 1 or end_time <= start_time:
             target_times = [start_time]
@@ -288,6 +289,42 @@ def sample_keyframes_for_segments(
                 "keyframes": keyframes,
             }
         )
+
+    total_keyframes = sum(len(segment.get("keyframes", [])) for segment in sampled_segments)
+    if total_keyframes > total_hard_cap:
+        counts = [len(segment.get("keyframes", [])) for segment in sampled_segments]
+        quotas = [count * total_hard_cap / total_keyframes for count in counts]
+        keep_counts = [
+            min(count, max(1, int(math.floor(quota)))) if count else 0
+            for count, quota in zip(counts, quotas)
+        ]
+        remaining = total_hard_cap - sum(keep_counts)
+        order = sorted(
+            range(len(counts)),
+            key=lambda index: quotas[index] - math.floor(quotas[index]),
+            reverse=True,
+        )
+        for index in order:
+            if remaining <= 0:
+                break
+            if keep_counts[index] < counts[index]:
+                keep_counts[index] += 1
+                remaining -= 1
+
+        for segment, keep_count in zip(sampled_segments, keep_counts):
+            keyframes = segment.get("keyframes", [])
+            if len(keyframes) <= keep_count:
+                continue
+            if keep_count <= 1:
+                segment["keyframes"] = [keyframes[len(keyframes) // 2]]
+                continue
+            indices = {
+                round(index * (len(keyframes) - 1) / (keep_count - 1))
+                for index in range(keep_count)
+            }
+            segment["keyframes"] = [
+                keyframe for index, keyframe in enumerate(keyframes) if index in indices
+            ]
 
     return sampled_segments
 
@@ -401,7 +438,7 @@ def run_video_inference(
                 segment_explanations = explanation_service.build_segment_explanations(
                     segments=anomaly_segments,
                     frames_timeline=frames_timeline,
-                    max_segments=5,
+                    max_segments=4,
                 )
                 from .explainability_assets import persist_segment_explanation_frames
 

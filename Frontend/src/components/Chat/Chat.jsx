@@ -89,10 +89,20 @@ const Chat = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [contextReportId, setContextReportId] = useState(null);
+  const [reports, setReports] = useState([]);
+  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
   const location = useLocation();
   const messagesRef = useRef(null);
+  const contextAttachRef = useRef(null);
 
   const formatTime = (value) => new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const selectedContextReport = reports.find((report) => report.id === contextReportId);
+  const formatReportOption = (report) => {
+    const confidence = report.confidence === null || report.confidence === undefined
+      ? 'N/A'
+      : `${(Number(report.confidence) * 100).toFixed(1)}%`;
+    return `${report.filename} • ${report.top_class || 'Unknown'} • ${confidence}`;
+  };
 
   const filteredThreads = threads.filter((thread) => {
     if (!searchQuery.trim()) return true;
@@ -123,6 +133,14 @@ const Chat = () => {
     const headers = getAuthHeaders();
     if (!headers) return [];
     const response = await fetch(`${API_BASE}/chat/threads`, { headers });
+    if (!response.ok) return [];
+    return response.json();
+  };
+
+  const fetchReports = async () => {
+    const headers = getAuthHeaders();
+    if (!headers) return [];
+    const response = await fetch(`${API_BASE}/users/me/reports`, { headers });
     if (!response.ok) return [];
     return response.json();
   };
@@ -184,6 +202,8 @@ const Chat = () => {
     setActiveThreadId(null);
     setMessages([]);
     setIsInitial(true);
+    setContextReportId(null);
+    setIsContextMenuOpen(false);
     if (window.innerWidth <= 720) setIsSidebarOpen(false);
   };
 
@@ -222,13 +242,15 @@ const Chat = () => {
     setInput('');
     setIsStreaming(true);
 
+    const requestPayload = { content: userMessage.text };
+    if (contextReportId) {
+      requestPayload.report_id = contextReportId;
+    }
+
     const response = await fetch(`${API_BASE}/chat/threads/${threadId}/messages`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ 
-        content: userMessage.text,
-        report_id: contextReportId 
-      }),
+      body: JSON.stringify(requestPayload),
     });
     console.log(`[CHAT_TIMING][FE] response_received_ms=${Math.round(performance.now() - requestStartedAt)}`);
 
@@ -326,6 +348,8 @@ const Chat = () => {
     const init = async () => {
       const params = new URLSearchParams(location.search);
       const rid = params.get('reportId');
+      const reportList = await fetchReports();
+      setReports(Array.isArray(reportList) ? reportList : []);
       
       if (rid) {
         // We have a report context: start a fresh chat
@@ -345,6 +369,55 @@ const Chat = () => {
     init();
   }, [location.search]);
 
+  const renderContextAttach = () => (
+    <div ref={contextAttachRef} className={`context-attach ${contextReportId ? 'has-context' : ''} ${isContextMenuOpen ? 'open' : ''}`}>
+      <button
+        className="context-plus-btn"
+        type="button"
+        title="Add report context"
+        onClick={() => setIsContextMenuOpen((prev) => !prev)}
+      >
+        <span>+</span>
+      </button>
+      <div className="context-attach-menu">
+        <div className="context-menu-title">
+          <Brain size={14} />
+          <span>Add context</span>
+        </div>
+        <button
+          type="button"
+          className={`context-report-option ${!contextReportId ? 'selected' : ''}`}
+          onClick={() => {
+            setContextReportId(null);
+            setIsContextMenuOpen(false);
+          }}
+        >
+          <span>No report context</span>
+        </button>
+        <div className="context-report-list">
+          {reports.length === 0 ? (
+            <div className="context-empty">No reports available</div>
+          ) : (
+            reports.map((report) => (
+              <button
+                type="button"
+                key={report.id}
+                className={`context-report-option ${report.id === contextReportId ? 'selected' : ''}`}
+                onClick={() => {
+                  setContextReportId(report.id);
+                  setIsContextMenuOpen(false);
+                }}
+              >
+                <FileText size={14} />
+                <span>{formatReportOption(report)}</span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   useEffect(() => {
     const handleResize = () => {
       setIsSidebarOpen(window.innerWidth > 720);
@@ -354,6 +427,18 @@ const Chat = () => {
     window.addEventListener('resize', handleResize);
 
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (!contextAttachRef.current || contextAttachRef.current.contains(event.target)) {
+        return;
+      }
+      setIsContextMenuOpen(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, []);
 
   return (
@@ -451,8 +536,17 @@ const Chat = () => {
               <div className="welcome-glow-bg"></div>
               <h1 className="hero-title">Welcome To <span className="text-gradient">SecureVision AI</span></h1>
               <p className="hero-subtitle">Your intelligent security companion is ready to assist you.</p>
+              {selectedContextReport && (
+                <div className="context-badge hero-context-badge">
+                  <Brain size={14} /> {selectedContextReport.filename}
+                  <button className="clear-context" onClick={() => setContextReportId(null)} title="Clear report context">
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
               
               <div className="hero-search-wrapper">
+                {renderContextAttach()}
                 <input 
                   type="text" 
                   placeholder="Ask Anything..." 
@@ -482,9 +576,9 @@ const Chat = () => {
                 <span className="topbar-brand">SecureVision AI</span>
               </div>
               <div className="top-bar-right">
-                {contextReportId && (
+                {selectedContextReport && (
                   <div className="context-badge">
-                    <Brain size={14} /> Context Active
+                    <Brain size={14} /> {selectedContextReport.filename}
                     <button className="clear-context" onClick={() => setContextReportId(null)} title="Clear report context">
                       <X size={12} />
                     </button>
@@ -558,6 +652,7 @@ const Chat = () => {
 
             <div className="sticky-input-container">
               <div className="premium-input-pill">
+                {renderContextAttach()}
                 <input 
                   type="text" 
                   placeholder="Ask Anything..." 

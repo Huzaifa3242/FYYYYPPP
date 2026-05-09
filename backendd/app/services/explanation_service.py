@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 def build_segment_explanations(
     segments: List[Dict],
     frames_timeline: List[Tuple[float, str]],
-    max_segments: int = 5,
+    max_segments: int = 4,
 ) -> List[Dict]:
     """
     High-level explainability builder.
@@ -37,15 +37,25 @@ def build_segment_explanations(
     if not sampled_segments:
         return []
 
-    logger.info(
-        "Explainability caption check: sampled_segments=%s token_configured=%s",
-        len(sampled_segments),
-        bool(settings.HF_API_TOKEN),
-    )
-
     if not settings.HF_API_TOKEN:
         logger.warning("HF_API_TOKEN is not configured; returning keyframes without HF captions")
 
+    frame_paths: List[str] = []
+    frame_refs: List[Dict] = []
+
+    for segment in sampled_segments:
+        for keyframe in segment.get("keyframes", []):
+            path = keyframe.get("path")
+            if not path:
+                continue
+            frame_paths.append(path)
+            frame_refs.append(keyframe)
+
+    captions = caption_service.generate_captions_batch(frame_paths)
+    captions_by_keyframe_id = {
+        id(keyframe): caption
+        for keyframe, caption in zip(frame_refs, captions)
+    }
     explanations: List[Dict] = []
 
     for segment in sampled_segments:
@@ -54,15 +64,11 @@ def build_segment_explanations(
             path = keyframe.get("path")
             if not path:
                 continue
-            if settings.HF_API_TOKEN:
-                caption = caption_service.generate_caption(path)
-            else:
-                caption = caption_service.CAPTION_DISABLED
             keyframes.append(
                 {
                     "time_sec": float(keyframe.get("time_sec", 0.0)),
                     "path": path,
-                    "caption": caption,
+                    "caption": captions_by_keyframe_id.get(id(keyframe), caption_service.CAPTION_FALLBACK),
                 }
             )
 

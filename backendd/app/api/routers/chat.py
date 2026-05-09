@@ -256,13 +256,19 @@ def create_message_stream(
             # Format report findings for the LLM
             findings = []
             if report.segment_explanations:
-                for seg in report.segment_explanations:
+                for index, seg in enumerate(report.segment_explanations, start=1):
                     cls = seg.get("classname", "Unknown")
+                    seg_conf = float(seg.get("confidence", 0.0))
+                    start_s = float(seg.get("start_time_sec", 0.0))
+                    end_s = float(seg.get("end_time_sec", 0.0))
+                    findings.append(
+                        f"Segment {index}: {cls}, confidence {seg_conf * 100:.1f}%, from {start_s:.2f}s to {end_s:.2f}s"
+                    )
                     kfs = seg.get("keyframes", [])
                     for kf in kfs:
                         cap = kf.get("caption", "No description")
-                        time_s = kf.get("time_sec", 0)
-                        findings.append(f"- At {time_s}s: {cls} situation. Visuals: {cap}")
+                        time_s = float(kf.get("time_sec", 0))
+                        findings.append(f"  - At {time_s:.2f}s: {cap}")
             
             report_context = (
                 f"\n\nIMPORTANT CONTEXT: THE USER IS ASKING ABOUT A SPECIFIC DETECTED INCIDENT.\n"
@@ -270,7 +276,9 @@ def create_message_stream(
                 f"- File: {report.filename}\n"
                 f"- Classification: {report.top_class}\n"
                 f"- Confidence Score: {report.confidence * 100:.1f}%\n"
-                f"- Visual Timeline Events:\n" + ("\n".join(findings) if findings else "No specific visual timeline details available.") +
+                f"- Duration: {report.duration_sec:.2f} seconds\n"
+                f"- Existing Security Analysis Report:\n{report.llm_report or 'No security analysis report was generated.'}\n"
+                f"- Segment Explanations and Keyframe Captions:\n" + ("\n".join(findings) if findings else "No segment explanations or keyframe captions available.") +
                 f"\n\nINSTRUCTION: When answering, refer to the specific details above to explain what happened in this video."
             )
             logger.info("[CHAT_CONTEXT] Successfully injected context for report=%s (%s findings)", report.id, len(findings))
